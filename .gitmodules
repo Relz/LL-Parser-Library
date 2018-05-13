@@ -1,0 +1,3 @@
+[submodule "LLTableBuilderLibrary"]
+	path = LLTableBuilderLibrary
+	url = https://github.com/Relz/LL-Table-Builder-Library
