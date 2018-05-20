@@ -4,6 +4,8 @@
 #include <string>
 #include "LLTableBuilderLibrary/LLTableBuilder.h"
 
+class TokenInformation;
+
 class LLParser
 {
 public:
@@ -11,8 +13,9 @@ public:
 
 	bool IsValid(
 		std::string const & inputFileName,
+		std::vector<TokenInformation> & tokenInformations,
 		size_t & failIndex,
-		std::unordered_set<std::string> & expectedWords) const;
+		std::unordered_set<Token> & expectedWords) const;
 
 private:
 	static std::string const END_OF_LINE_STRING;

@@ -1,6 +1,7 @@
 #include "LLParser.h"
 #include <stack>
 #include "LLTableBuilderLibrary/Table/TableRow/TableRow.h"
+#include "LLTableBuilderLibrary/TokenLibrary/TokenInformation/TokenInformation.h"
 #include "LexerLibrary/Lexer.h"
 #include "LexerLibrary/TokenLibrary/TokenInformation/TokenInformation.h"
 
@@ -11,9 +12,11 @@ LLParser::LLParser(std::string const & ruleFileName)
 
 bool LLParser::IsValid(
 	std::string const & inputFileName,
+	std::vector<TokenInformation> & tokenInformations,
 	size_t & failIndex,
-	std::unordered_set<std::string> & expectedWords) const
+	std::unordered_set<Token> & expectedTokens) const
 {
+	bool result;
 	Lexer lexer(inputFileName);
 	Table const & table = m_llTableBuilder.GetTable();
 	std::stack<unsigned int> stack;
@@ -24,26 +27,31 @@ bool LLParser::IsValid(
 	{
 		return false;
 	}
+	tokenInformations.emplace_back(std::move(tokenInformation));
 	while (true)
 	{
-		std::string const & currentToken = TokenExtensions::ToString(tokenInformation.GetToken());
+		Token currentToken = tokenInformation.GetToken();
 		TableRow * currentRow = table.GetRow(currentRowId);
 		if (currentRow == nullptr)
 		{
-			return false;
+			result = false;
+			break;
 		}
 		if (currentRow->referencingSet.find(currentToken) != currentRow->referencingSet.end())
 		{
 			if (currentRow->isEnd && stack.empty())
 			{
-				return true;
+				result = true;
+				break;
 			}
 			if (currentRow->doShift)
 			{
 				if (!lexer.GetNextTokenInformation(tokenInformation))
 				{
-					return false;
+					result = false;
+					break;
 				}
+				tokenInformations.emplace_back(std::move(tokenInformation));
 				++inputWordIndex;
 			}
 			else if (currentRow->pushToStack != 0)
@@ -58,7 +66,8 @@ bool LLParser::IsValid(
 			{
 				if (stack.empty())
 				{
-					return false;
+					result = false;
+					break;
 				}
 				currentRowId = stack.top();
 				stack.pop();
@@ -67,24 +76,30 @@ bool LLParser::IsValid(
 		else if (currentRow->isError)
 		{
 			failIndex = inputWordIndex;
-			expectedWords.insert(
+			expectedTokens.insert(
 				std::make_move_iterator(currentRow->referencingSet.begin()),
 				std::make_move_iterator(currentRow->referencingSet.end()));
 			--currentRowId;
 			currentRow = table.GetRow(currentRowId);
 			while (currentRow != nullptr && !currentRow->isError)
 			{
-				expectedWords.insert(
+				expectedTokens.insert(
 					std::make_move_iterator(currentRow->referencingSet.begin()),
 					std::make_move_iterator(currentRow->referencingSet.end()));
 				--currentRowId;
 				currentRow = table.GetRow(currentRowId);
 			}
-			return false;
+			result = false;
+			break;
 		}
 		else
 		{
 			++currentRowId;
 		}
 	}
+	while (lexer.GetNextTokenInformation(tokenInformation))
+	{
+		tokenInformations.emplace_back(std::move(tokenInformation));
+	}
+	return result;
 }
