@@ -9,6 +9,11 @@ SET(SOURCE_FILES
 
 ADD_LIBRARY(LLParserLibrary SHARED ${SOURCE_FILES})
 
-ADD_SUBDIRECTORY(LLTableBuilderLibrary)
+IF (NOT TARGET LLTableBuilderLibrary)
+	ADD_SUBDIRECTORY(LLTableBuilderLibrary)
+ENDIF ()
+IF (NOT TARGET LexerLibrary)
+	ADD_SUBDIRECTORY(LexerLibrary)
+ENDIF ()
 
-TARGET_LINK_LIBRARIES(LLParserLibrary LLTableBuilderLibrary)
+TARGET_LINK_LIBRARIES(LLParserLibrary LLTableBuilderLibrary LexerLibrary)

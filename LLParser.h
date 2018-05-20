@@ -7,10 +7,10 @@
 class LLParser
 {
 public:
-	explicit LLParser(std::string const & inputFileName);
+	explicit LLParser(std::string const & ruleFileName);
 
 	bool IsValid(
-		std::vector<std::string> const & inputWords,
+		std::string const & inputFileName,
 		size_t & failIndex,
 		std::unordered_set<std::string> & expectedWords) const;
 
