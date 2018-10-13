@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="GitSharedSettings">
+    <option name="FORCE_PUSH_PROHIBITED_PATTERNS">
+      <list />
+    </option>
+  </component>
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LLTableBuilderLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LLTableBuilderLibrary/InputLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LLTableBuilderLibrary/InputLibrary/StreamStringLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LLTableBuilderLibrary/TokenLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LLTableBuilderLibrary/TokenLibrary/StreamStringLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LexerLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LexerLibrary/InputLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LexerLibrary/InputLibrary/StreamStringLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LexerLibrary/TokenLibrary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/LexerLibrary/TokenLibrary/StreamStringLibrary" vcs="Git" />
   </component>
 </project>
