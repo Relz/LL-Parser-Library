@@ -1,9 +1,12 @@
 #include "LLParser.h"
-#include <stack>
 #include "LLTableBuilderLibrary/Table/TableRow/TableRow.h"
 #include "LLTableBuilderLibrary/TokenLibrary/TokenInformation/TokenInformation.h"
+#include "LLTableBuilderLibrary/TokenLibrary/TokenExtensions/TokenExtensions.h"
 #include "LexerLibrary/Lexer.h"
 #include "LexerLibrary/TokenLibrary/TokenInformation/TokenInformation.h"
+#include <string>
+#include <stack>
+#include <functional>
 
 LLParser::LLParser(std::string const & ruleFileName)
 	: m_llTableBuilder(ruleFileName)
@@ -61,6 +64,13 @@ bool LLParser::IsValid(
 			if (currentRow->nextId != 0)
 			{
 				currentRowId = currentRow->nextId;
+				if (!currentRow->actionName.empty())
+				{
+					if (ACTION_NAME_TO_ACTION_MAP.find(currentRow->actionName) != ACTION_NAME_TO_ACTION_MAP.end())
+					{
+						ACTION_NAME_TO_ACTION_MAP.at(currentRow->actionName)();
+					}
+				}
 			}
 			else
 			{
@@ -71,6 +81,13 @@ bool LLParser::IsValid(
 				}
 				currentRowId = stack.top();
 				stack.pop();
+				if (!currentRow->actionName.empty())
+				{
+					if (ACTION_NAME_TO_ACTION_MAP.find(currentRow->actionName) != ACTION_NAME_TO_ACTION_MAP.end())
+					{
+						ACTION_NAME_TO_ACTION_MAP.at(currentRow->actionName)();
+					}
+				}
 			}
 		}
 		else if (currentRow->isError)
@@ -102,4 +119,19 @@ bool LLParser::IsValid(
 		tokenInformations.emplace_back(std::move(tokenInformation));
 	}
 	return result;
+}
+
+void LLParser::ProgramAction()
+{
+	std::cout << "ProgramAction!" << "\n";
+}
+
+void LLParser::VariableDeclarationAction()
+{
+	std::cout << "VariableDeclarationAction!" << "\n";
+}
+
+void LLParser::AssignmentAction()
+{
+	std::cout << "AssignmentAction!" << "\n";
 }

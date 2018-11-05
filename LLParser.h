@@ -1,8 +1,8 @@
 #ifndef LLPARSERLIBRARY_LIBRARY_H
 #define LLPARSERLIBRARY_LIBRARY_H
 
-#include <string>
 #include "LLTableBuilderLibrary/LLTableBuilder.h"
+#include <unordered_map>
 
 class TokenInformation;
 
@@ -15,12 +15,22 @@ public:
 		std::string const & inputFileName,
 		std::vector<TokenInformation> & tokenInformations,
 		size_t & failIndex,
-		std::unordered_set<Token> & expectedWords) const;
+		std::unordered_set<Token> & expectedWords
+	) const;
 
 private:
-	static std::string const END_OF_LINE_STRING;
+	void ProgramAction();
+	void VariableDeclarationAction();
+	void AssignmentAction();
+
+	std::unordered_map<std::string, std::function<void()>> const ACTION_NAME_TO_ACTION_MAP {
+			{ "ProgramAction", std::bind(&LLParser::ProgramAction, this) },
+			{ "VariableDeclarationAction", std::bind(&LLParser::VariableDeclarationAction, this) },
+			{ "AssignmentAction", std::bind(&LLParser::AssignmentAction, this) },
+	};
 
 	LLTableBuilder m_llTableBuilder;
+
 };
 
 #endif
