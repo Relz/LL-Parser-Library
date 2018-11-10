@@ -69,7 +69,7 @@ bool LLParser::IsValid(
 					result = false;
 					break;
 				}
-				tokenInformations.emplace_back(std::move(tokenInformation));
+				tokenInformations.emplace_back(tokenInformation);
 				++inputWordIndex;
 				newToken = true;
 			}
