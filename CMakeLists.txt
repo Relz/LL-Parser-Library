@@ -5,7 +5,9 @@ SET(CMAKE_CXX_STANDARD 17)
 
 SET(SOURCE_FILES
 	LLParser.cpp
-	LLParser.h)
+	LLParser.h
+	AstNode/AstNode.cpp
+	AstNode/AstNode.h)
 
 ADD_LIBRARY(LLParserLibrary SHARED ${SOURCE_FILES})
 

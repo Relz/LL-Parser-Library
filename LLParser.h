@@ -2,7 +2,9 @@
 #define LLPARSERLIBRARY_LIBRARY_H
 
 #include "LLTableBuilderLibrary/LLTableBuilder.h"
+#include "AstNode/AstNode.h"
 #include <unordered_map>
+#include <stack>
 
 class TokenInformation;
 
@@ -19,6 +21,16 @@ public:
 	) const;
 
 private:
+	AstNode * CreateAstNode(
+		std::string const & ruleName, unsigned int tokenCount, std::stack<AstNode *> & astStack
+	) const;
+
+	bool TryToCreateAstNode(
+		std::string const & actionName, std::stack<AstNode *> & astStack
+	) const;
+
+	void ResolveActionName(std::string const & actionName, std::stack<AstNode *> & astStack) const;
+
 	void ProgramAction();
 	void VariableDeclarationAction();
 	void AssignmentAction();
