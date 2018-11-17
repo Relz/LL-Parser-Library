@@ -228,3 +228,13 @@ void LLParser::AssignmentAction()
 {
 	std::cout << "AssignmentAction!" << "\n";
 }
+
+void LLParser::CreateScopeAction()
+{
+	std::cout << "Create scope!" << "\n";
+}
+
+void LLParser::DestroyScopeAction()
+{
+	std::cout << "Destroy scope!" << "\n";
+}

@@ -36,15 +36,18 @@ private:
 	void ProgramAction();
 	void VariableDeclarationAction();
 	void AssignmentAction();
+	void CreateScopeAction();
+	void DestroyScopeAction();
 
 	std::unordered_map<std::string, std::function<void()>> const ACTION_NAME_TO_ACTION_MAP {
-			{ "ProgramAction", std::bind(&LLParser::ProgramAction, this) },
-			{ "VariableDeclarationAction", std::bind(&LLParser::VariableDeclarationAction, this) },
-			{ "AssignmentAction", std::bind(&LLParser::AssignmentAction, this) },
+		{ "ProgramAction", std::bind(&LLParser::ProgramAction, this) },
+		{ "VariableDeclarationAction", std::bind(&LLParser::VariableDeclarationAction, this) },
+		{ "AssignmentAction", std::bind(&LLParser::AssignmentAction, this) },
+		{ "Create scope", std::bind(&LLParser::CreateScopeAction, this) },
+		{ "Destroy scope", std::bind(&LLParser::DestroyScopeAction, this) },
 	};
 
 	LLTableBuilder m_llTableBuilder;
-
 };
 
 #endif
