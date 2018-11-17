@@ -29,7 +29,9 @@ private:
 		std::string const & actionName, std::stack<AstNode *> & astStack
 	) const;
 
-	void ResolveActionName(std::string const & actionName, std::stack<AstNode *> & astStack) const;
+	static bool ParseCreateAstNodeAction(std::string const & actionName, std::string & ruleName, unsigned int & tokenCount);
+	void ResolveActionName(std::string const & actionName) const;
+	void ResolveAstActionName(std::string const & actionName, std::stack<AstNode *> & astStack) const;
 
 	void ProgramAction();
 	void VariableDeclarationAction();

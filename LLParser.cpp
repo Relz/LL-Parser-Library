@@ -48,6 +48,7 @@ bool LLParser::IsValid(
 		{
 			newToken = false;
 		}
+		ResolveActionName(currentRow->actionName);
 		if (currentRow->referencingSet.find(currentToken) != currentRow->referencingSet.end() || !currentRow->actionName.empty())
 		{
 			if (currentRow->isEnd && stack.empty())
@@ -55,7 +56,7 @@ bool LLParser::IsValid(
 				astStack.push(new AstNode());
 				astStack.top()->name = TokenExtensions::ToString(currentToken);
 				astStack.top()->stringValue = tokenInformation.GetTokenStreamString().string;
-				ResolveActionName(currentRow->actionName, astStack);
+				ResolveAstActionName(currentRow->actionName, astStack);
 				result = true;
 				break;
 			}
@@ -90,7 +91,7 @@ bool LLParser::IsValid(
 				}
 				currentRowId = stack.top();
 				stack.pop();
-				ResolveActionName(currentRow->actionName, astStack);
+				ResolveAstActionName(currentRow->actionName, astStack);
 			}
 		}
 		else if (currentRow->isError)
@@ -147,34 +148,69 @@ AstNode * LLParser::CreateAstNode(
 	return astNode;
 }
 
-bool LLParser::TryToCreateAstNode(
-	std::string const & actionName, std::stack<AstNode *> & astStack
-) const
+bool LLParser::ParseCreateAstNodeAction(
+	std::string const & actionName, std::string & ruleName, unsigned int & tokenCount
+)
 {
 	static std::regex regEx("CreateAstNode_(.+)_Using_([0-9]+)");
 	std::smatch match;
 	if (std::regex_search(actionName, match, regEx))
 	{
-		std::string const & ruleName = match[1];
-		unsigned int tokenCount = stoul(match[2]);
-
-		AstNode * astNode = CreateAstNode(ruleName, tokenCount, astStack);
-		astStack.push(astNode);
-
+		ruleName = match[1];
+		tokenCount = stoul(match[2]);
 		return true;
 	}
 	return false;
 }
 
-void LLParser::ResolveActionName(std::string const & actionName, std::stack<AstNode *> & astStack) const
+bool LLParser::TryToCreateAstNode(
+	std::string const & actionName, std::stack<AstNode *> & astStack
+) const
 {
+	std::string ruleName;
+	unsigned int tokenCount;
+	if (LLParser::ParseCreateAstNodeAction(actionName, ruleName, tokenCount))
+	{
+		AstNode * astNode = CreateAstNode(ruleName, tokenCount, astStack);
+		astStack.push(astNode);
+		return true;
+	}
+	return false;
+}
+
+void LLParser::ResolveActionName(std::string const & actionName) const
+{
+	if (actionName.empty())
+	{
+		return;
+	}
 	if (ACTION_NAME_TO_ACTION_MAP.find(actionName) == ACTION_NAME_TO_ACTION_MAP.end())
 	{
-		TryToCreateAstNode(actionName, astStack);
+		std::string tmp0;
+		unsigned int tmp1;
+		if (!ParseCreateAstNodeAction(actionName, tmp0, tmp1))
+		{
+			std::cout << "Warning: unhandled action name: " << actionName << "\n";
+		}
 	}
 	else
 	{
 		ACTION_NAME_TO_ACTION_MAP.at(actionName)();
+	}
+}
+
+void LLParser::ResolveAstActionName(std::string const & actionName, std::stack<AstNode *> & astStack) const
+{
+	if (actionName.empty())
+	{
+		return;
+	}
+	if (ACTION_NAME_TO_ACTION_MAP.find(actionName) == ACTION_NAME_TO_ACTION_MAP.end())
+	{
+		if (!TryToCreateAstNode(actionName, astStack))
+		{
+			std::cout << "Warning: unhandled action name: " << actionName << "\n";
+		}
 	}
 }
 
