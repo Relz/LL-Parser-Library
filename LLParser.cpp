@@ -71,6 +71,8 @@ bool LLParser::IsValid(
 			{
 				m_ast.emplace_back(new AstNode());
 				m_ast.back()->name = TokenExtensions::ToString(currentToken);
+				m_ast.back()->type = m_ast.back()->name;
+				m_ast.back()->computedType = m_ast.back()->name;
 				m_ast.back()->stringValue = tokenInformation.GetTokenStreamString().string;
 				if (!ResolveAstActionName(currentRow->actionName))
 				{
@@ -85,6 +87,8 @@ bool LLParser::IsValid(
 			{
 				m_ast.emplace_back(new AstNode());
 				m_ast.back()->name = TokenExtensions::ToString(currentToken);
+				m_ast.back()->type = m_ast.back()->name;
+				m_ast.back()->computedType = m_ast.back()->name;
 				m_ast.back()->stringValue = tokenInformation.GetTokenStreamString().string;
 				if (!lexer.GetNextTokenInformation(tokenInformation))
 				{
@@ -336,23 +340,37 @@ bool LLParser::Synthesis()
 bool LLParser::SynthesisPlus()
 {
 	bool identifiersExists = false;
-	std::string lhsType = m_ast[m_ast.size() - 2]->name;
+	std::string lhsType = m_ast[m_ast.size() - 2]->type;
 	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
-		lhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			lhsType = symbolTableRow.type;
+		}
+		else
+		{
+			lhsType = m_ast[m_ast.size() - 2]->computedType;
+		}
 	}
-	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->name;
+	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->type;
 	std::string & rhs = m_ast[m_ast.size() - 1]->children[1]->stringValue;
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
-		rhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			rhsType = symbolTableRow.type;
+		}
+		else
+		{
+			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+		}
 	}
 	std::string & resultType = lhsType;
 	bool areTypesCompatible = true;
@@ -396,7 +414,8 @@ bool LLParser::SynthesisPlus()
 	}
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 	}
 	else
 	{
@@ -408,7 +427,8 @@ bool LLParser::SynthesisPlus()
 
 			return false;
 		}
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = resultType;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 		m_ast[m_ast.size() - 2]->stringValue = operationResult;
 		m_ast[m_ast.size() - 2]->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
@@ -420,23 +440,37 @@ bool LLParser::SynthesisPlus()
 bool LLParser::SynthesisMinus()
 {
 	bool identifiersExists = false;
-	std::string lhsType = m_ast[m_ast.size() - 2]->name;
+	std::string lhsType = m_ast[m_ast.size() - 2]->type;
 	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
-		lhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			lhsType = symbolTableRow.type;
+		}
+		else
+		{
+			lhsType = m_ast[m_ast.size() - 2]->computedType;
+		}
 	}
-	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->name;
+	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->type;
 	std::string & rhs = m_ast[m_ast.size() - 1]->children[1]->stringValue;
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
-		rhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			rhsType = symbolTableRow.type;
+		}
+		else
+		{
+			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+		}
 	}
 	std::string & resultType = lhsType;
 	bool areTypesCompatible = true;
@@ -480,7 +514,8 @@ bool LLParser::SynthesisMinus()
 	}
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 	}
 	else
 	{
@@ -492,7 +527,8 @@ bool LLParser::SynthesisMinus()
 
 			return false;
 		}
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = resultType;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 		m_ast[m_ast.size() - 2]->stringValue = operationResult;
 		m_ast[m_ast.size() - 2]->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
@@ -504,22 +540,37 @@ bool LLParser::SynthesisMinus()
 bool LLParser::SynthesisMultiply()
 {
 	bool identifiersExists = false;
-	std::string lhsType = m_ast[m_ast.size() - 2]->name;
+	std::string lhsType = m_ast[m_ast.size() - 2]->type;
 	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
-		lhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			lhsType = symbolTableRow.type;
+		}
+		else
+		{
+			lhsType = m_ast[m_ast.size() - 2]->computedType;
+		}
 	}
-	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->name;
+	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->type;
 	std::string & rhs = m_ast[m_ast.size() - 1]->children[1]->stringValue;
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
-		rhsType = symbolTableRow.type;
+		identifiersExists = true;
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			rhsType = symbolTableRow.type;
+		}
+		else
+		{
+			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+		}
 	}
 	std::string & resultType = lhsType;
 	bool areTypesCompatible = true;
@@ -564,7 +615,8 @@ bool LLParser::SynthesisMultiply()
 
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 	}
 	else
 	{
@@ -576,7 +628,8 @@ bool LLParser::SynthesisMultiply()
 
 			return false;
 		}
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = resultType;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 		m_ast[m_ast.size() - 2]->stringValue = operationResult;
 		m_ast[m_ast.size() - 2]->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
@@ -588,23 +641,37 @@ bool LLParser::SynthesisMultiply()
 bool LLParser::SynthesisIntegerDivision()
 {
 	bool identifiersExists = false;
-	std::string lhsType = m_ast[m_ast.size() - 2]->name;
+	std::string lhsType = m_ast[m_ast.size() - 2]->type;
 	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
-		lhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			lhsType = symbolTableRow.type;
+		}
+		else
+		{
+			lhsType = m_ast[m_ast.size() - 2]->computedType;
+		}
 	}
-	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->name;
+	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->type;
 	std::string & rhs = m_ast[m_ast.size() - 1]->children[1]->stringValue;
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
-		rhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			rhsType = symbolTableRow.type;
+		}
+		else
+		{
+			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+		}
 	}
 	bool areTypesCompatible = true;
 	if (lhsType != rhsType)
@@ -644,7 +711,8 @@ bool LLParser::SynthesisIntegerDivision()
 
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->name = TokenConstant::CoreType::Number::INTEGER;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
+		m_ast[m_ast.size() - 2]->computedType = TokenConstant::CoreType::Number::INTEGER;
 	}
 	else
 	{
@@ -656,7 +724,8 @@ bool LLParser::SynthesisIntegerDivision()
 
 			return false;
 		}
-		m_ast[m_ast.size() - 2]->name = TokenConstant::CoreType::Number::INTEGER;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::CoreType::Number::INTEGER;
+		m_ast[m_ast.size() - 2]->computedType = TokenConstant::CoreType::Number::INTEGER;
 		m_ast[m_ast.size() - 2]->stringValue = operationResult;
 		m_ast[m_ast.size() - 2]->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
@@ -685,23 +754,37 @@ void LLParser::PrintErrorMessage(std::string const & message) const
 bool LLParser::SynthesisDivision()
 {
 	bool identifiersExists = false;
-	std::string lhsType = m_ast[m_ast.size() - 2]->name;
+	std::string lhsType = m_ast[m_ast.size() - 2]->type;
 	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
-		lhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			lhsType = symbolTableRow.type;
+		}
+		else
+		{
+			lhsType = m_ast[m_ast.size() - 2]->computedType;
+		}
 	}
-	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->name;
+	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->type;
 	std::string & rhs = m_ast[m_ast.size() - 1]->children[1]->stringValue;
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
-		rhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			rhsType = symbolTableRow.type;
+		}
+		else
+		{
+			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+		}
 	}
 	bool areTypesCompatible = true;
 	if (lhsType != rhsType)
@@ -741,7 +824,8 @@ bool LLParser::SynthesisDivision()
 
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->name = TokenConstant::CoreType::Number::FLOAT;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
+		m_ast[m_ast.size() - 2]->computedType = TokenConstant::CoreType::Number::FLOAT;
 	}
 	else
 	{
@@ -753,7 +837,8 @@ bool LLParser::SynthesisDivision()
 
 			return false;
 		}
-		m_ast[m_ast.size() - 2]->name = TokenConstant::CoreType::Number::FLOAT;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::CoreType::Number::FLOAT;
+		m_ast[m_ast.size() - 2]->computedType = TokenConstant::CoreType::Number::FLOAT;
 		m_ast[m_ast.size() - 2]->stringValue = operationResult;
 		m_ast[m_ast.size() - 2]->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
@@ -765,23 +850,37 @@ bool LLParser::SynthesisDivision()
 bool LLParser::SynthesisModulus()
 {
 	bool identifiersExists = false;
-	std::string lhsType = m_ast[m_ast.size() - 2]->name;
+	std::string lhsType = m_ast[m_ast.size() - 2]->type;
 	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
-		lhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			lhsType = symbolTableRow.type;
+		}
+		else
+		{
+			lhsType = m_ast[m_ast.size() - 2]->computedType;
+		}
 	}
-	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->name;
+	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->type;
 	std::string & rhs = m_ast[m_ast.size() - 1]->children[1]->stringValue;
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
-		rhsType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			rhsType = symbolTableRow.type;
+		}
+		else
+		{
+			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+		}
 	}
 	std::string & resultType = lhsType;
 	bool areTypesCompatible = true;
@@ -826,7 +925,8 @@ bool LLParser::SynthesisModulus()
 
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 	}
 	else
 	{
@@ -838,7 +938,8 @@ bool LLParser::SynthesisModulus()
 
 			return false;
 		}
-		m_ast[m_ast.size() - 2]->name = resultType;
+		m_ast[m_ast.size() - 2]->type = resultType;
+		m_ast[m_ast.size() - 2]->computedType = resultType;
 		m_ast[m_ast.size() - 2]->stringValue = operationResult;
 		m_ast[m_ast.size() - 2]->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
@@ -851,19 +952,20 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality()
 {
 	std::string variableType = m_ast[m_ast.size() - 3]->children.front()->stringValue;
 	std::string & variableName = m_ast[m_ast.size() - 3]->children[1]->stringValue;
-	if (variableType == TokenConstant::Name::IDENTIFIER)
-	{
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(variableName, symbolTableRow);
-		variableType = symbolTableRow.type;
-	}
-	std::string rightHandType = m_ast[m_ast.size() - 1]->name;
+	std::string rightHandType = m_ast[m_ast.size() - 1]->type;
 	std::string & rightHandValue = m_ast[m_ast.size() - 1]->stringValue;
 	if (rightHandType == TokenConstant::Name::IDENTIFIER)
 	{
-		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByName(rightHandValue, symbolTableRow);
-		rightHandType = symbolTableRow.type;
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rightHandValue, symbolTableRow);
+			rightHandType = symbolTableRow.type;
+		}
+		else
+		{
+			rightHandType = m_ast[m_ast.size() - 1]->computedType;
+		}
 	}
 	bool areTypesCompatible = true;
 	if (variableType != rightHandType)
@@ -885,8 +987,55 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality()
 	{
 		PrintErrorMessage(
 			"Cannot set value \"" + rightHandValue + "\"" + "(" + "\"" + rightHandType + "\"" + " type" + ")"
-			+ " to variable " + "\"" + variableName + "\"" + "(" + "\"" + variableType + "\"" + " type" + ")" + "\n"
-		);
+			+ " to variable " + "\"" + variableName + "\"" + "(" + "\"" + variableType + "\"" + " type" + ")" + "\n");
+	}
+
+	return areTypesCompatible;
+}
+
+bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
+{
+	std::string & variableName = m_ast[m_ast.size() - 3]->stringValue;
+	SymbolTableRow symbolTableRow;
+	m_symbolTable.GetSymbolTableRowByName(variableName, symbolTableRow);
+	std::string & variableType = symbolTableRow.type;
+	std::string rightHandType = m_ast[m_ast.size() - 1]->type;
+	std::string & rightHandValue = m_ast[m_ast.size() - 1]->stringValue;
+	if (rightHandType == TokenConstant::Name::IDENTIFIER)
+	{
+		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		{
+			SymbolTableRow symbolTableRow;
+			m_symbolTable.GetSymbolTableRowByName(rightHandValue, symbolTableRow);
+			rightHandType = symbolTableRow.type;
+		}
+		else
+		{
+			rightHandType = m_ast[m_ast.size() - 1]->computedType;
+		}
+	}
+
+	bool areTypesCompatible = true;
+	if (variableType != rightHandType)
+	{
+		if (EXTRA_COMPATIBLE_TYPES.find(variableType) == EXTRA_COMPATIBLE_TYPES.end())
+		{
+			areTypesCompatible = false;
+		}
+		else
+		{
+			std::unordered_set<std::string> & variableExtraCompatibleTypes = EXTRA_COMPATIBLE_TYPES.at(variableType);
+			if (variableExtraCompatibleTypes.find(rightHandType) == variableExtraCompatibleTypes.end())
+			{
+				areTypesCompatible = false;
+			}
+		}
+	}
+	if (!areTypesCompatible)
+	{
+		PrintErrorMessage(
+			"Cannot set value \"" + rightHandValue + "\"" + "(" + "\"" + rightHandType + "\"" + " type" + ")"
+			+ " to variable " + "\"" + variableName + "\"" + "(" + "\"" + variableType + "\"" + " type" + ")" + "\n");
 	}
 
 	return areTypesCompatible;
@@ -894,11 +1043,8 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality()
 
 bool LLParser::SynthesisType()
 {
-	m_ast[m_ast.size() - 1]->name = m_ast[m_ast.size() - 1]->children.front()->name;
-	return true;
-}
+	m_ast[m_ast.size() - 1]->type = m_ast[m_ast.size() - 1]->children.front()->type;
+	m_ast[m_ast.size() - 1]->computedType = m_ast[m_ast.size() - 1]->children.front()->computedType;
 
-bool LLParser::SynthesisVariableDeclarationAAssignmentFloat()
-{
 	return true;
 }

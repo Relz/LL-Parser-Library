@@ -47,8 +47,8 @@ private:
 	bool SynthesisDivision();
 	bool SynthesisModulus();
 	bool CheckVariableTypeWithAssignmentRightHandTypeForEquality();
+	bool CheckIdentifierTypeWithAssignmentRightHandTypeForEquality();
 	bool SynthesisType();
-	bool SynthesisVariableDeclarationAAssignmentFloat();
 
 	void PrintColoredMessage(std::string const & message, std::string const & colorCode) const;
 	void PrintWarningMessage(std::string const & message) const;
@@ -62,50 +62,103 @@ private:
 		{ "Check identifier for existing", std::bind(&LLParser::CheckIdentifierForExisting, this) },
 		{ "Synthesis", std::bind(&LLParser::Synthesis, this) },
 		{ "Check variable type with AssignmentRightHand type for equality", std::bind(&LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality, this) },
+		{ "Check identifier type with AssignmentRightHand type for equality", std::bind(&LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality, this) },
 
 		{ "Synthesis Plus Integer", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus Integer B", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus Float", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus Float B", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus Identifier", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus Identifier B", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus ArithmeticMinus", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus ArithmeticMultiply", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus ArithmeticDivision", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus ArithmeticModule", std::bind(&LLParser::SynthesisPlus, this) },
 
 		{ "Synthesis Minus Integer", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus Integer B", std::bind(&LLParser::SynthesisMinus, this) },
 		{ "Synthesis Minus Float", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus Float B", std::bind(&LLParser::SynthesisMinus, this) },
 		{ "Synthesis Minus Identifier", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus Identifier B", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus ArithmeticMinus", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus ArithmeticMultiply", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus ArithmeticDivision", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus ArithmeticModule", std::bind(&LLParser::SynthesisMinus, this) },
 
 		{ "Synthesis Multiply Integer", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply Integer B", std::bind(&LLParser::SynthesisMultiply, this) },
 		{ "Synthesis Multiply Float", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply Float B", std::bind(&LLParser::SynthesisMultiply, this) },
 		{ "Synthesis Multiply Identifier", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply Identifier B", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply ArithmeticMinus", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply ArithmeticMultiply", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply ArithmeticDivision", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply ArithmeticModule", std::bind(&LLParser::SynthesisMultiply, this) },
 
 		{ "Synthesis Integer division Integer", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division Integer B", std::bind(&LLParser::SynthesisIntegerDivision, this) },
 		{ "Synthesis Integer division Float", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division Float B", std::bind(&LLParser::SynthesisIntegerDivision, this) },
 		{ "Synthesis Integer division Identifier", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division Identifier B", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division ArithmeticMinus", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division ArithmeticMultiply", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division ArithmeticDivision", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division ArithmeticModule", std::bind(&LLParser::SynthesisIntegerDivision, this) },
 
 		{ "Synthesis Division Integer", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division Integer B", std::bind(&LLParser::SynthesisDivision, this) },
 		{ "Synthesis Division Float", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division Float B", std::bind(&LLParser::SynthesisDivision, this) },
 		{ "Synthesis Division Identifier", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division Identifier B", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division ArithmeticMinus", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division ArithmeticMultiply", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division ArithmeticDivision", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division ArithmeticModule", std::bind(&LLParser::SynthesisDivision, this) },
 
 		{ "Synthesis Modulus Integer", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus Integer B", std::bind(&LLParser::SynthesisModulus, this) },
 		{ "Synthesis Modulus Float", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus Float B", std::bind(&LLParser::SynthesisModulus, this) },
 		{ "Synthesis Modulus Identifier", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus Identifier B", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus ArithmeticMinus", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus ArithmeticMultiply", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus ArithmeticDivision", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus ArithmeticModule", std::bind(&LLParser::SynthesisModulus, this) },
 
 		{ "Synthesis Integer A", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Float A", std::bind(&LLParser::SynthesisType, this) },
+		{ "Synthesis Identifier A", std::bind(&LLParser::SynthesisType, this) },
 
 		{ "Synthesis Integer B", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Float B", std::bind(&LLParser::SynthesisType, this) },
+		{ "Synthesis Identifier B", std::bind(&LLParser::SynthesisType, this) },
 
 		{ "Synthesis Integer C", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Float C", std::bind(&LLParser::SynthesisType, this) },
+		{ "Synthesis Identifier C", std::bind(&LLParser::SynthesisType, this) },
 
 		{ "Synthesis Integer D", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Float D", std::bind(&LLParser::SynthesisType, this) },
+		{ "Synthesis Identifier D", std::bind(&LLParser::SynthesisType, this) },
 
 		{ "Synthesis Integer E", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Float E", std::bind(&LLParser::SynthesisType, this) },
+		{ "Synthesis Identifier E", std::bind(&LLParser::SynthesisType, this) },
 
 		{ "Synthesis Integer F", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Float F", std::bind(&LLParser::SynthesisType, this) },
-
-		{ "Synthesis Plus Integer B", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Identifier F", std::bind(&LLParser::SynthesisType, this) },
 	};
 
 	std::unordered_set<std::string> IGNORED_ACTION_NAME {
@@ -113,10 +166,6 @@ private:
 		"Synthesis VariableDeclaration Semicolon",
 		"Synthesis Type Identifier",
 		"Synthesis Left curly bracket StatementList Right curly bracket",
-		//"Synthesis VariableDeclarationA Assignment Integer",
-		//"Synthesis VariableDeclarationA Assignment Float",
-		//"Synthesis VariableDeclarationA Assignment String literal",
-		//"Synthesis VariableDeclarationA Assignment Identifier",
 		"Synthesis Identifier Assignment Integer",
 		"Synthesis Left curly bracket Right curly bracket",
 		"Synthesis SemicolonedVariableDeclaration SemicolonedVariableDeclaration",
@@ -125,11 +174,24 @@ private:
 		"Synthesis StatementListBlock StatementList",
 		"Synthesis VariableDeclarationA Assignment String literal",
 		"Synthesis VariableDeclarationA Assignment Integer",
-		"Synthesis VariableDeclarationA Assignment Float"
+		"Synthesis VariableDeclarationA Assignment Float",
+		"Synthesis VariableDeclarationA Assignment Character literal",
+		"Synthesis VariableDeclarationA Assignment ArithmeticPlus",
+		"Synthesis VariableDeclarationA Assignment ArithmeticMinus",
+		"Synthesis VariableDeclarationA Assignment ArithmeticMultiply",
+		"Synthesis VariableDeclarationA Assignment ArithmeticDivision",
+		"Synthesis VariableDeclarationA Assignment ArithmeticIntegerDivision",
+		"Synthesis VariableDeclarationA Assignment ArithmeticModule",
+		"Synthesis Identifier Assignment ArithmeticPlus",
+		"Synthesis Identifier Assignment ArithmeticMinus",
+		"Synthesis Identifier Assignment ArithmeticMultiply",
+		"Synthesis SemicolonedAssignment SemicolonedAssignment",
+		"Synthesis SemicolonedAssignment StatementList",
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
 		{ TokenConstant::CoreType::Complex::STRING, { TokenConstant::Name::STRING_LITERAL }},
+		{ TokenConstant::CoreType::CHARACTER, { TokenConstant::Name::CHARACTER_LITERAL }},
 		{ TokenConstant::CoreType::Number::FLOAT, { TokenConstant::CoreType::Number::INTEGER }}
 	};
 

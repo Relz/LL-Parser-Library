@@ -8,6 +8,8 @@ class AstNode
 {
 public:
 	std::string name;
+	std::string type;
+	std::string computedType;
 	AstNode * father;
 	std::vector<AstNode*> children;
 
