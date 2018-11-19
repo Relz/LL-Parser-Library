@@ -25,7 +25,7 @@ bool Calculator::Add(
 			result = std::to_string(stof(lhs) + stof(rhs));
 			break;
 		default:
-			errorMessage = "Unsupported type \"" + type + "\"" + "\n";
+			errorMessage = "Unsupported type for adding: \"" + type + "\"" + "\n";
 
 			return false;
 	}
@@ -56,7 +56,7 @@ bool Calculator::Subtract(
 			result = std::to_string(stof(lhs) - stof(rhs));
 			break;
 		default:
-			errorMessage = "Unsupported type \"" + type + "\"" + "\n";
+			errorMessage = "Unsupported type for subtracting: \"" + type + "\"" + "\n";
 
 			return false;
 	}
@@ -86,7 +86,7 @@ bool Calculator::Multiply(
 			result = std::to_string(stof(lhs) * stof(rhs));
 			break;
 		default:
-			errorMessage = "Unsupported type \"" + type + "\"" + "\n";
+			errorMessage = "Unsupported type for multiplying: \"" + type + "\"" + "\n";
 
 			return false;
 	}
@@ -122,7 +122,7 @@ bool Calculator::IntegerDivision(
 			result = std::to_string(stoi(lhs) / rhsInteger);
 			break;
 		default:
-			errorMessage = "Unsupported type \"" + type + "\"" + "\n";
+			errorMessage = "Unsupported type for integer dividing: \"" + type + "\"" + "\n";
 
 			return false;
 	}
@@ -151,7 +151,7 @@ bool Calculator::Division(
 			result = std::to_string(stof(lhs) / stof(rhs));
 			break;
 		default:
-			errorMessage = "Unsupported type \"" + type + "\"" + "\n";
+			errorMessage = "Unsupported type for dividing: \"" + type + "\"" + "\n";
 
 			return false;
 	}
@@ -180,7 +180,7 @@ bool Calculator::Modulus(
 			result = std::to_string(stoi(lhs) % stoi(rhs));
 			break;
 		default:
-			errorMessage = "Unsupported type \"" + type + "\"" + "\n";
+			errorMessage = "Unsupported type for moduling: \"" + type + "\"" + "\n";
 
 			return false;
 	}

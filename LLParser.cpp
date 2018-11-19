@@ -1048,3 +1048,10 @@ bool LLParser::SynthesisType()
 
 	return true;
 }
+
+bool LLParser::RoundBrackets()
+{
+	m_ast[m_ast.size() - 1] = m_ast[m_ast.size() - 1]->children[1];
+
+	return true;
+}
