@@ -25,24 +25,20 @@ bool SymbolTable::RemoveRow(unsigned int rowIndex)
 	bool result = rowIndex < m_table.size();
 	if (result)
 	{
-		m_table.erase(m_table.begin() + rowIndex, m_table.begin() + rowIndex + 1);
+		m_table[rowIndex].name = "";
+		m_table[rowIndex].type = "";
+		m_table[rowIndex].arrayInformation = nullptr;
 	}
 	return result;
 }
 
-bool SymbolTable::GetSymbolTableRowByName(std::string const & name, SymbolTableRow & result)
+bool SymbolTable::GetSymbolTableRowByRowIndex(unsigned int rowIndex, SymbolTableRow & result)
 {
-	auto resultIt = std::find_if(m_table.begin(), m_table.end(), [&name](SymbolTableRow const & symbolTableRow) {
-		return symbolTableRow.name == name;
-	});
-	if (resultIt == m_table.end())
+	if (rowIndex < m_table.size())
 	{
-		return false;
-	}
-	else
-	{
-		result = *resultIt;
+		result = m_table[rowIndex];
 
 		return true;
 	}
+	return false;
 }

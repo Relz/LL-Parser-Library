@@ -231,7 +231,7 @@ bool LLParser::TryToCreateAstNode(std::string const & actionName)
 
 bool LLParser::ResolveActionName(std::string const & actionName) const
 {
-	if (actionName.empty() || IGNORED_ACTION_NAME.find(actionName) != IGNORED_ACTION_NAME.end())
+	if (actionName.empty() || IGNORED_ACTION_NAMES.find(actionName) != IGNORED_ACTION_NAMES.end())
 	{
 		return true;
 	}
@@ -262,6 +262,19 @@ bool LLParser::ResolveAstActionName(std::string const & actionName)
 		return TryToCreateAstNode(actionName);
 	}
 	return true;
+}
+
+unsigned int LLParser::FindRowIndexInScopeByName(std::string const & name) const
+{
+	auto const & it = std::find_if(
+		m_scopes.begin(),
+		m_scopes.end(),
+		[&name](std::unordered_map<std::string, unsigned int> const & scope)
+		{
+			return scope.find(name) != scope.end();
+		}
+	);
+	return it->at(name);
 }
 
 bool LLParser::CreateScopeAction()
@@ -348,7 +361,7 @@ bool LLParser::SynthesisPlus()
 		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
 			lhsType = symbolTableRow.type;
 		}
 		else
@@ -364,7 +377,7 @@ bool LLParser::SynthesisPlus()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
 			rhsType = symbolTableRow.type;
 		}
 		else
@@ -441,14 +454,14 @@ bool LLParser::SynthesisMinus()
 {
 	bool identifiersExists = false;
 	std::string lhsType = m_ast[m_ast.size() - 2]->type;
-	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
+	std::string lhs = m_ast[m_ast.size() - 2]->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
 		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
 			lhsType = symbolTableRow.type;
 		}
 		else
@@ -464,12 +477,69 @@ bool LLParser::SynthesisMinus()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
 			rhsType = symbolTableRow.type;
 		}
 		else
 		{
 			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+		}
+	}
+	bool isUnaryMinus = false;
+	if (lhs == TokenConstant::Operator::Assignment::ASSIGNMENT
+		|| lhs == TokenConstant::Operator::Assignment::DIVISION_ASSIGNMENT
+		|| lhs == TokenConstant::Operator::Assignment::INTEGER_DIVISION_ASSIGNMENT
+		|| lhs == TokenConstant::Operator::Assignment::MINUS_ASSIGNMENT
+		|| lhs == TokenConstant::Operator::Assignment::MODULUS_ASSIGNMENT
+		|| lhs == TokenConstant::Operator::Assignment::MULTIPLY_ASSIGNMENT
+		|| lhs == TokenConstant::Operator::Assignment::PLUS_ASSIGNMENT
+	)
+	{
+		isUnaryMinus = true;
+		lhsType = rhsType;
+		lhs = "0";
+
+		AstNode * zero = new AstNode();
+		zero-> name = m_ast.back()->children[1]->name;
+		zero->type = lhsType;
+		zero->computedType = lhsType;
+		zero->stringValue = lhs;
+
+		AstNode * arithmeticMinus = new AstNode();
+		arithmeticMinus->name = "ArithmeticMinus"; // WARNING: Hardcoded
+		arithmeticMinus->type = identifiersExists ? TokenConstant::Name::IDENTIFIER : lhsType;
+		arithmeticMinus->computedType = lhsType;
+		arithmeticMinus->children.emplace_back(zero);
+		arithmeticMinus->children.emplace_back(m_ast.back());
+
+		m_ast.pop_back();
+		m_ast.emplace_back(arithmeticMinus);
+	}
+	bool add = false;
+	if (lhs == TokenConstant::Operator::Arithmetic::MINUS)
+	{
+		lhsType = rhsType;
+		lhs = "0";
+		m_ast[m_ast.size() - 2]->name = m_ast.back()->children[1]->name;
+		m_ast[m_ast.size() - 2]->type = m_ast.back()->children[1]->type;
+		m_ast[m_ast.size() - 2]->computedType = m_ast.back()->children[1]->computedType;
+		m_ast[m_ast.size() - 2]->stringValue = lhs;
+
+		AstNode * arithmeticOperator = m_ast.back()->children.front();
+		if (arithmeticOperator->stringValue == TokenConstant::Operator::Arithmetic::PLUS)
+		{
+			arithmeticOperator->name = TokenConstant::Name::Operator::Arithmetic::MINUS;
+			arithmeticOperator->type = TokenConstant::Name::Operator::Arithmetic::MINUS;
+			arithmeticOperator->computedType = TokenConstant::Name::Operator::Arithmetic::MINUS;
+			arithmeticOperator->stringValue = TokenConstant::Operator::Arithmetic::MINUS;
+		}
+		else if (arithmeticOperator->stringValue == TokenConstant::Operator::Arithmetic::MINUS)
+		{
+			add = true;
+			arithmeticOperator->name = TokenConstant::Name::Operator::Arithmetic::PLUS;
+			arithmeticOperator->type = TokenConstant::Name::Operator::Arithmetic::PLUS;
+			arithmeticOperator->computedType = TokenConstant::Name::Operator::Arithmetic::PLUS;
+			arithmeticOperator->stringValue = TokenConstant::Operator::Arithmetic::PLUS;
 		}
 	}
 	std::string & resultType = lhsType;
@@ -514,14 +584,18 @@ bool LLParser::SynthesisMinus()
 	}
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
-		m_ast[m_ast.size() - 2]->computedType = resultType;
+		if (!isUnaryMinus)
+		{
+			m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
+			m_ast[m_ast.size() - 2]->computedType = resultType;
+		}
 	}
 	else
 	{
 		std::string operationResult;
 		std::string errorMessage;
-		if (!Calculator::Subtract(lhs, rhs, resultType, operationResult, errorMessage))
+		if ((add && !Calculator::Add(lhs, rhs, resultType, operationResult, errorMessage))
+			|| (!add && !Calculator::Subtract(lhs, rhs, resultType, operationResult, errorMessage)))
 		{
 			PrintErrorMessage(errorMessage);
 
@@ -532,6 +606,10 @@ bool LLParser::SynthesisMinus()
 		m_ast[m_ast.size() - 2]->stringValue = operationResult;
 		m_ast[m_ast.size() - 2]->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
+		if (isUnaryMinus)
+		{
+			m_ast.pop_back();
+		}
 	}
 
 	return true;
@@ -548,7 +626,7 @@ bool LLParser::SynthesisMultiply()
 		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
 			lhsType = symbolTableRow.type;
 		}
 		else
@@ -564,7 +642,7 @@ bool LLParser::SynthesisMultiply()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
 			rhsType = symbolTableRow.type;
 		}
 		else
@@ -649,7 +727,7 @@ bool LLParser::SynthesisIntegerDivision()
 		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
 			lhsType = symbolTableRow.type;
 		}
 		else
@@ -665,7 +743,7 @@ bool LLParser::SynthesisIntegerDivision()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
 			rhsType = symbolTableRow.type;
 		}
 		else
@@ -762,7 +840,7 @@ bool LLParser::SynthesisDivision()
 		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
 			lhsType = symbolTableRow.type;
 		}
 		else
@@ -778,7 +856,7 @@ bool LLParser::SynthesisDivision()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
 			rhsType = symbolTableRow.type;
 		}
 		else
@@ -858,7 +936,7 @@ bool LLParser::SynthesisModulus()
 		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(lhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
 			lhsType = symbolTableRow.type;
 		}
 		else
@@ -874,7 +952,7 @@ bool LLParser::SynthesisModulus()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rhs, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
 			rhsType = symbolTableRow.type;
 		}
 		else
@@ -959,7 +1037,7 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rightHandValue, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rightHandValue), symbolTableRow);
 			rightHandType = symbolTableRow.type;
 		}
 		else
@@ -997,7 +1075,7 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
 {
 	std::string & variableName = m_ast[m_ast.size() - 3]->stringValue;
 	SymbolTableRow symbolTableRow;
-	m_symbolTable.GetSymbolTableRowByName(variableName, symbolTableRow);
+	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(variableName), symbolTableRow);
 	std::string & variableType = symbolTableRow.type;
 	std::string rightHandType = m_ast[m_ast.size() - 1]->type;
 	std::string & rightHandValue = m_ast[m_ast.size() - 1]->stringValue;
@@ -1006,7 +1084,7 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
 		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByName(rightHandValue, symbolTableRow);
+			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rightHandValue), symbolTableRow);
 			rightHandType = symbolTableRow.type;
 		}
 		else
@@ -1043,15 +1121,44 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
 
 bool LLParser::SynthesisType()
 {
-	m_ast[m_ast.size() - 1]->type = m_ast[m_ast.size() - 1]->children.front()->type;
-	m_ast[m_ast.size() - 1]->computedType = m_ast[m_ast.size() - 1]->children.front()->computedType;
+	m_ast.back()->type = m_ast.back()->children.front()->type;
+	m_ast.back()->computedType = m_ast.back()->children.front()->computedType;
 
 	return true;
 }
 
-bool LLParser::RoundBrackets()
+bool LLParser::RemoveBrackets()
 {
-	m_ast[m_ast.size() - 1] = m_ast[m_ast.size() - 1]->children[1];
+	m_ast.back() = m_ast.back()->children[1];
 
+	return true;
+}
+
+bool LLParser::RemoveIfRoundBrackets()
+{
+	std::vector<AstNode *> & ifKeyword = m_ast.back()->children;
+	ifKeyword.erase(ifKeyword.begin() + 1);
+	ifKeyword.erase(ifKeyword.begin() + 2);
+
+	return true;
+}
+
+bool LLParser::RemoveSemicolon()
+{
+	m_ast.back() = m_ast.back()->children.front();
+
+	return true;
+}
+
+bool LLParser::RemoveScopeBrackets()
+{
+	m_ast.back()->children.pop_back();
+	m_ast.erase(m_ast.end() - 2);
+
+	return true;
+}
+
+bool LLParser::abc()
+{
 	return true;
 }

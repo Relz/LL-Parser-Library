@@ -33,6 +33,8 @@ private:
 	bool ResolveActionName(std::string const & actionName) const;
 	bool ResolveAstActionName(std::string const & actionName);
 
+	unsigned int FindRowIndexInScopeByName(std::string const & name) const;
+
 	bool CreateScopeAction();
 	bool DestroyScopeAction();
 	void computeDimensions(std::vector<unsigned int> & dimensions);
@@ -49,7 +51,11 @@ private:
 	bool CheckVariableTypeWithAssignmentRightHandTypeForEquality();
 	bool CheckIdentifierTypeWithAssignmentRightHandTypeForEquality();
 	bool SynthesisType();
-	bool RoundBrackets();
+	bool RemoveBrackets();
+	bool RemoveIfRoundBrackets();
+	bool RemoveSemicolon();
+	bool RemoveScopeBrackets();
+	bool abc();
 
 	void PrintColoredMessage(std::string const & message, std::string const & colorCode) const;
 	void PrintWarningMessage(std::string const & message) const;
@@ -209,29 +215,30 @@ private:
 		{ "Synthesis Float F", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Identifier F", std::bind(&LLParser::SynthesisType, this) },
 
-		{ "Synthesis Left round bracket Integer Right round bracket", std::bind(&LLParser::RoundBrackets, this) },
-		{ "Synthesis Left round bracket Float Right round bracket", std::bind(&LLParser::RoundBrackets, this) },
-		{ "Synthesis Left round bracket Identifier Right round bracket", std::bind(&LLParser::RoundBrackets, this) },
-		{ "Synthesis Left round bracket String Right round bracket", std::bind(&LLParser::RoundBrackets, this) },
-		{ "Synthesis Left round bracket String literal Right round bracket", std::bind(&LLParser::RoundBrackets, this) },
-		{ "Synthesis Left round bracket Character Right round bracket", std::bind(&LLParser::RoundBrackets, this) },
-		{ "Synthesis Left round bracket Character literal Right round bracket", std::bind(&LLParser::RoundBrackets, this) },
+		{ "Synthesis Left round bracket Integer Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left round bracket Float Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left round bracket Identifier Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left round bracket String Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left round bracket String literal Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left round bracket Character Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left round bracket Character literal Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis If keyword Left round bracket Identifier Right round bracket Statement", std::bind(&LLParser::RemoveIfRoundBrackets, this) },
+		{ "Synthesis Assignment Semicolon", std::bind(&LLParser::RemoveSemicolon, this) },
+		{ "Synthesis VariableDeclaration Semicolon", std::bind(&LLParser::RemoveSemicolon, this) },
+		{ "Synthesis Left curly bracket Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis VariableDeclaration StatementList Right curly bracket", std::bind(&LLParser::RemoveScopeBrackets, this) },
+		{ "Synthesis StatementList StatementList", std::bind(&LLParser::abc, this) },
+		{ "Synthesis Left curly bracket StatementList Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 	};
 
-	std::unordered_set<std::string> IGNORED_ACTION_NAME {
-		"Synthesis Assignment Semicolon",
-		"Synthesis VariableDeclaration Semicolon",
+	std::unordered_set<std::string> IGNORED_ACTION_NAMES {
 		"Synthesis Type Identifier",
-		"Synthesis Left curly bracket StatementList Right curly bracket",
-		"Synthesis Identifier Assignment Integer",
-		"Synthesis Left curly bracket Right curly bracket",
-		"Synthesis SemicolonedVariableDeclaration SemicolonedVariableDeclaration",
-		"Synthesis SemicolonedVariableDeclaration StatementList",
-		"Synthesis SemicolonedVariableDeclaration SemicolonedAssignment",
-		"Synthesis StatementListBlock StatementList",
-		"Synthesis VariableDeclarationA Assignment String literal",
 		"Synthesis VariableDeclarationA Assignment Integer",
 		"Synthesis VariableDeclarationA Assignment Float",
+		"Synthesis VariableDeclarationA Assignment Identifier",
+		"Synthesis VariableDeclarationA Assignment String",
+		"Synthesis VariableDeclarationA Assignment Character",
+		"Synthesis VariableDeclarationA Assignment String literal",
 		"Synthesis VariableDeclarationA Assignment Character literal",
 		"Synthesis VariableDeclarationA Assignment ArithmeticPlus",
 		"Synthesis VariableDeclarationA Assignment ArithmeticMinus",
@@ -239,14 +246,26 @@ private:
 		"Synthesis VariableDeclarationA Assignment ArithmeticDivision",
 		"Synthesis VariableDeclarationA Assignment ArithmeticIntegerDivision",
 		"Synthesis VariableDeclarationA Assignment ArithmeticModule",
+		"Synthesis Identifier Assignment Integer",
+		"Synthesis Identifier Assignment Float",
+		"Synthesis Identifier Assignment Identifier",
+		"Synthesis Identifier Assignment String",
+		"Synthesis Identifier Assignment Character",
+		"Synthesis Identifier Assignment String literal",
+		"Synthesis Identifier Assignment Character literal",
 		"Synthesis Identifier Assignment ArithmeticPlus",
 		"Synthesis Identifier Assignment ArithmeticMinus",
 		"Synthesis Identifier Assignment ArithmeticMultiply",
 		"Synthesis Identifier Assignment ArithmeticDivision",
 		"Synthesis Identifier Assignment ArithmeticIntegerDivision",
 		"Synthesis Identifier Assignment ArithmeticModule",
-		"Synthesis SemicolonedAssignment SemicolonedAssignment",
-		"Synthesis SemicolonedAssignment StatementList",
+		"Synthesis Assignment Identifier ArithmeticNegate",
+		"Synthesis VariableDeclaration VariableDeclaration",
+		"Synthesis VariableDeclaration StatementList",
+		"Synthesis Assignment StatementList",
+		"Synthesis Identifier StatementList",
+		"Synthesis VariableDeclaration If",
+		"Synthesis StatementListBlock StatementList",
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
