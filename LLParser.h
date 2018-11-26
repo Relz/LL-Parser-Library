@@ -9,6 +9,8 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <stack>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Value.h>
 
 class TokenInformation;
 
@@ -55,7 +57,12 @@ private:
 	bool RemoveIfRoundBrackets();
 	bool RemoveSemicolon();
 	bool RemoveScopeBrackets();
+	bool ExpandStatementList();
 	bool abc();
+
+	bool CreateLlvmIntegerValue();
+	bool CreateLlvmFloatValue();
+	bool SetLlvmValue(std::string const & type, std::string const & value, AstNode ** node);
 
 	void PrintColoredMessage(std::string const & message, std::string const & colorCode) const;
 	void PrintWarningMessage(std::string const & message) const;
@@ -70,6 +77,8 @@ private:
 		{ "Synthesis", std::bind(&LLParser::Synthesis, this) },
 		{ "Check variable type with AssignmentRightHand type for equality", std::bind(&LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality, this) },
 		{ "Check identifier type with AssignmentRightHand type for equality", std::bind(&LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality, this) },
+		{ "Create llvm integer value", std::bind(&LLParser::CreateLlvmIntegerValue, this) },
+		{ "Create llvm float value", std::bind(&LLParser::CreateLlvmFloatValue, this) },
 
 		{ "Synthesis Plus Integer", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus Integer B", std::bind(&LLParser::SynthesisPlus, this) },
@@ -227,8 +236,10 @@ private:
 		{ "Synthesis VariableDeclaration Semicolon", std::bind(&LLParser::RemoveSemicolon, this) },
 		{ "Synthesis Left curly bracket Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis VariableDeclaration StatementList Right curly bracket", std::bind(&LLParser::RemoveScopeBrackets, this) },
-		{ "Synthesis StatementList StatementList", std::bind(&LLParser::abc, this) },
+		{ "Synthesis VariableDeclaration StatementList", std::bind(&LLParser::ExpandStatementList, this) },
+		{ "Synthesis Assignment StatementList", std::bind(&LLParser::ExpandStatementList, this) },
 		{ "Synthesis Left curly bracket StatementList Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left curly bracket VariableDeclaration Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 	};
 
 	std::unordered_set<std::string> IGNORED_ACTION_NAMES {
@@ -261,11 +272,7 @@ private:
 		"Synthesis Identifier Assignment ArithmeticModule",
 		"Synthesis Assignment Identifier ArithmeticNegate",
 		"Synthesis VariableDeclaration VariableDeclaration",
-		"Synthesis VariableDeclaration StatementList",
-		"Synthesis Assignment StatementList",
-		"Synthesis Identifier StatementList",
 		"Synthesis VariableDeclaration If",
-		"Synthesis StatementListBlock StatementList",
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
@@ -278,6 +285,8 @@ private:
 	std::vector<AstNode *> m_ast;
 	std::vector<std::unordered_map<std::string, unsigned int>> m_scopes {{ }};
 	SymbolTable m_symbolTable;
+	llvm::LLVMContext m_context;
+	llvm::Module m_module;
 };
 
 #endif

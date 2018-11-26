@@ -9,9 +9,13 @@
 #include <functional>
 #include <regex>
 #include <unordered_set>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Value.h>
+#include <llvm/IR/Constants.h>
 
 LLParser::LLParser(std::string const & ruleFileName)
 	: m_llTableBuilder(ruleFileName)
+	, m_module("Main module", m_context)
 {
 }
 
@@ -164,7 +168,6 @@ AstNode * LLParser::CreateAstNode(
 	for (unsigned int i = 0; i < tokenCount; ++i)
 	{
 		astNode->children.insert(astNode->children.begin(), m_ast.back());
-		m_ast.back()->father = astNode;
 		if (m_ast.empty())
 		{
 			throw std::runtime_error(
@@ -320,7 +323,7 @@ bool LLParser::CheckIdentifierForAlreadyExisting()
 	{
 		if (scope.find(identifierNameToCheck) != scope.end())
 		{
-			PrintErrorMessage("Redeclaring identifier \"" + identifierNameToCheck + "\"");
+			PrintErrorMessage("Redeclaring identifier \"" + identifierNameToCheck + "\"" + "\n");
 
 			return false;
 		}
@@ -338,7 +341,7 @@ bool LLParser::CheckIdentifierForExisting()
 			return true;
 		}
 	}
-	PrintErrorMessage("Undeclared identifier \"" + identifierNameToCheck + "\"");
+	PrintErrorMessage("Undeclared identifier \"" + identifierNameToCheck + "\"" + "\n");
 
 	return false;
 }
@@ -353,12 +356,13 @@ bool LLParser::Synthesis()
 bool LLParser::SynthesisPlus()
 {
 	bool identifiersExists = false;
-	std::string lhsType = m_ast[m_ast.size() - 2]->type;
-	std::string & lhs = m_ast[m_ast.size() - 2]->stringValue;
+	AstNode * lhsNode = m_ast[m_ast.size() - 2];
+	std::string lhsType = lhsNode->type;
+	std::string & lhs = lhsNode->stringValue;
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (m_ast[m_ast.size() - 2]->computedType == TokenConstant::Name::IDENTIFIER)
+		if (lhsNode->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
 			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
@@ -366,15 +370,16 @@ bool LLParser::SynthesisPlus()
 		}
 		else
 		{
-			lhsType = m_ast[m_ast.size() - 2]->computedType;
+			lhsType = lhsNode->computedType;
 		}
 	}
-	std::string rhsType = m_ast[m_ast.size() - 1]->children[1]->type;
-	std::string & rhs = m_ast[m_ast.size() - 1]->children[1]->stringValue;
+	AstNode * rhsNode = m_ast[m_ast.size() - 1]->children[1];
+	std::string rhsType = rhsNode->type;
+	std::string & rhs = rhsNode->stringValue;
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
 			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
@@ -382,7 +387,7 @@ bool LLParser::SynthesisPlus()
 		}
 		else
 		{
-			rhsType = m_ast[m_ast.size() - 1]->children[1]->computedType;
+			rhsType = rhsNode->computedType;
 		}
 	}
 	std::string & resultType = lhsType;
@@ -427,8 +432,8 @@ bool LLParser::SynthesisPlus()
 	}
 	if (identifiersExists)
 	{
-		m_ast[m_ast.size() - 2]->type = TokenConstant::Name::IDENTIFIER;
-		m_ast[m_ast.size() - 2]->computedType = resultType;
+		lhsNode->type = TokenConstant::Name::IDENTIFIER;
+		lhsNode->computedType = resultType;
 	}
 	else
 	{
@@ -440,10 +445,11 @@ bool LLParser::SynthesisPlus()
 
 			return false;
 		}
-		m_ast[m_ast.size() - 2]->type = resultType;
-		m_ast[m_ast.size() - 2]->computedType = resultType;
-		m_ast[m_ast.size() - 2]->stringValue = operationResult;
-		m_ast[m_ast.size() - 2]->children.clear();
+		lhsNode->type = resultType;
+		lhsNode->computedType = resultType;
+		SetLlvmValue(resultType, operationResult, &lhsNode);
+		lhsNode->stringValue = operationResult;
+		lhsNode->children.clear();
 		m_ast[m_ast.size() - 1]->children.clear();
 	}
 
@@ -812,23 +818,6 @@ bool LLParser::SynthesisIntegerDivision()
 	return true;
 }
 
-void LLParser::PrintColoredMessage(std::string const & message, std::string const & colorCode) const
-{
-	std::cout << "\033[" + colorCode + "m";
-	std::cout << message;
-	std::cout << "\033[m";
-}
-
-void LLParser::PrintWarningMessage(std::string const & message) const
-{
-	PrintColoredMessage("Warning: " + message, "33");
-}
-
-void LLParser::PrintErrorMessage(std::string const & message) const
-{
-	PrintColoredMessage("Error: " + message, "31");
-}
-
 bool LLParser::SynthesisDivision()
 {
 	bool identifiersExists = false;
@@ -1129,7 +1118,9 @@ bool LLParser::SynthesisType()
 
 bool LLParser::RemoveBrackets()
 {
-	m_ast.back() = m_ast.back()->children[1];
+	m_ast.back()->children.erase(m_ast.back()->children.begin());
+	m_ast.back()->children.pop_back();
+	//m_ast.back() = m_ast.back()->children[1];
 
 	return true;
 }
@@ -1158,7 +1149,63 @@ bool LLParser::RemoveScopeBrackets()
 	return true;
 }
 
-bool LLParser::abc()
+bool LLParser::ExpandStatementList()
 {
+	std::vector<AstNode*> const & children = m_ast.back()->children.back()->children;
+	m_ast.back()->children.pop_back();
+	for (AstNode* child : children)
+	{
+		m_ast.back()->children.emplace_back(child);
+	}
 	return true;
+}
+
+bool LLParser::CreateLlvmIntegerValue()
+{
+	AstNode * astNode = m_ast.back();
+	astNode->llvmValue = llvm::ConstantInt::get(llvm::IntegerType::getInt32Ty(m_context), std::stoi(astNode->stringValue), true);
+
+	return true;
+}
+
+bool LLParser::CreateLlvmFloatValue()
+{
+	AstNode * astNode = m_ast.back();
+	astNode->llvmValue = llvm::ConstantFP::get(m_context, llvm::APFloat(std::stof(astNode->stringValue)));
+
+	return true;
+}
+
+bool LLParser::SetLlvmValue(std::string const & type, std::string const & value, AstNode ** node)
+{
+	if (type == TokenConstant::Name::INTEGER)
+	{
+		(*node)->llvmValue = llvm::ConstantInt::get(llvm::IntegerType::getInt32Ty(m_context), std::stoi(value), true);
+
+		return true;
+	}
+	else if (type == TokenConstant::Name::FLOAT)
+	{
+		(*node)->llvmValue = llvm::ConstantFP::get(m_context, llvm::APFloat(std::stof(value)));
+
+		return true;
+	}
+	return false;
+}
+
+void LLParser::PrintColoredMessage(std::string const & message, std::string const & colorCode) const
+{
+	std::cout << "\033[" + colorCode + "m";
+	std::cout << message;
+	std::cout << "\033[m";
+}
+
+void LLParser::PrintWarningMessage(std::string const & message) const
+{
+	PrintColoredMessage("Warning: " + message, "33");
+}
+
+void LLParser::PrintErrorMessage(std::string const & message) const
+{
+	PrintColoredMessage("Error: " + message, "31");
 }
