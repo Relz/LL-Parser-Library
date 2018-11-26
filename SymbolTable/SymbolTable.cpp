@@ -32,7 +32,7 @@ bool SymbolTable::RemoveRow(unsigned int rowIndex)
 	return result;
 }
 
-bool SymbolTable::GetSymbolTableRowByRowIndex(unsigned int rowIndex, SymbolTableRow & result)
+bool SymbolTable::GetSymbolTableRowByRowIndex(unsigned int rowIndex, SymbolTableRow & result) const
 {
 	if (rowIndex < m_table.size())
 	{

@@ -10,7 +10,7 @@ class SymbolTable
 public:
 	unsigned int CreateRow(std::string const & type, std::string const & name, std::vector<unsigned int> const & dimensions);
 	bool RemoveRow(unsigned int rowIndex);
-	bool GetSymbolTableRowByRowIndex(unsigned int rowIndex, SymbolTableRow & result);
+	bool GetSymbolTableRowByRowIndex(unsigned int rowIndex, SymbolTableRow & result) const;
 
 private:
 	std::vector<SymbolTableRow> m_table;

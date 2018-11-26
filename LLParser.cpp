@@ -316,10 +316,10 @@ bool LLParser::AddVariableToScope()
 	return true;
 }
 
-bool LLParser::CheckIdentifierForAlreadyExisting()
+bool LLParser::CheckIdentifierForAlreadyExisting() const
 {
-	std::string & identifierNameToCheck = m_ast[m_ast.size() - 1]->stringValue;
-	for (std::unordered_map<std::string, unsigned int> & scope : m_scopes)
+	std::string const & identifierNameToCheck = m_ast[m_ast.size() - 1]->stringValue;
+	for (std::unordered_map<std::string, unsigned int> const & scope : m_scopes)
 	{
 		if (scope.find(identifierNameToCheck) != scope.end())
 		{
@@ -331,10 +331,10 @@ bool LLParser::CheckIdentifierForAlreadyExisting()
 	return true;
 }
 
-bool LLParser::CheckIdentifierForExisting()
+bool LLParser::CheckIdentifierForExisting() const
 {
-	std::string & identifierNameToCheck = m_ast[m_ast.size() - 1]->stringValue;
-	for (std::unordered_map<std::string, unsigned int> & scope : m_scopes)
+	std::string const & identifierNameToCheck = m_ast[m_ast.size() - 1]->stringValue;
+	for (std::unordered_map<std::string, unsigned int> const & scope : m_scopes)
 	{
 		if (scope.find(identifierNameToCheck) != scope.end())
 		{
@@ -348,7 +348,7 @@ bool LLParser::CheckIdentifierForExisting()
 
 bool LLParser::Synthesis()
 {
-	m_ast[m_ast.size() - 1] = m_ast[m_ast.size() - 1]->children.front();
+	m_ast.back() = m_ast.back()->children.front();
 
 	return true;
 }
@@ -1015,7 +1015,7 @@ bool LLParser::SynthesisModulus()
 	return true;
 }
 
-bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality()
+bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 {
 	std::string variableType = m_ast[m_ast.size() - 3]->children.front()->stringValue;
 	std::string & variableName = m_ast[m_ast.size() - 3]->children[1]->stringValue;
@@ -1043,7 +1043,7 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality()
 		}
 		else
 		{
-			std::unordered_set<std::string> & variableExtraCompatibleTypes = EXTRA_COMPATIBLE_TYPES.at(variableType);
+			std::unordered_set<std::string> const & variableExtraCompatibleTypes = EXTRA_COMPATIBLE_TYPES.at(variableType);
 			if (variableExtraCompatibleTypes.find(rightHandType) == variableExtraCompatibleTypes.end())
 			{
 				areTypesCompatible = false;
@@ -1060,7 +1060,7 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality()
 	return areTypesCompatible;
 }
 
-bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
+bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const
 {
 	std::string & variableName = m_ast[m_ast.size() - 3]->stringValue;
 	SymbolTableRow symbolTableRow;
@@ -1070,7 +1070,7 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
 	std::string & rightHandValue = m_ast[m_ast.size() - 1]->stringValue;
 	if (rightHandType == TokenConstant::Name::IDENTIFIER)
 	{
-		if (m_ast[m_ast.size() - 1]->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
+		if (m_ast.back()->children[1]->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
 			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rightHandValue), symbolTableRow);
@@ -1078,7 +1078,7 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
 		}
 		else
 		{
-			rightHandType = m_ast[m_ast.size() - 1]->computedType;
+			rightHandType = m_ast.back()->computedType;
 		}
 	}
 
@@ -1091,7 +1091,7 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality()
 		}
 		else
 		{
-			std::unordered_set<std::string> & variableExtraCompatibleTypes = EXTRA_COMPATIBLE_TYPES.at(variableType);
+			std::unordered_set<std::string> const & variableExtraCompatibleTypes = EXTRA_COMPATIBLE_TYPES.at(variableType);
 			if (variableExtraCompatibleTypes.find(rightHandType) == variableExtraCompatibleTypes.end())
 			{
 				areTypesCompatible = false;
@@ -1173,6 +1173,11 @@ bool LLParser::CreateLlvmFloatValue()
 	AstNode * astNode = m_ast.back();
 	astNode->llvmValue = llvm::ConstantFP::get(m_context, llvm::APFloat(std::stof(astNode->stringValue)));
 
+	return true;
+}
+
+bool LLParser::abc()
+{
 	return true;
 }
 

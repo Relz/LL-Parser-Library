@@ -41,8 +41,8 @@ private:
 	bool DestroyScopeAction();
 	void computeDimensions(std::vector<unsigned int> & dimensions);
 	bool AddVariableToScope();
-	bool CheckIdentifierForAlreadyExisting();
-	bool CheckIdentifierForExisting();
+	bool CheckIdentifierForAlreadyExisting() const;
+	bool CheckIdentifierForExisting() const;
 	bool Synthesis();
 	bool SynthesisPlus();
 	bool SynthesisMinus();
@@ -50,8 +50,8 @@ private:
 	bool SynthesisIntegerDivision();
 	bool SynthesisDivision();
 	bool SynthesisModulus();
-	bool CheckVariableTypeWithAssignmentRightHandTypeForEquality();
-	bool CheckIdentifierTypeWithAssignmentRightHandTypeForEquality();
+	bool CheckVariableTypeWithAssignmentRightHandTypeForEquality() const;
+	bool CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const;
 	bool SynthesisType();
 	bool RemoveBrackets();
 	bool RemoveIfRoundBrackets();
@@ -240,6 +240,7 @@ private:
 		{ "Synthesis Assignment StatementList", std::bind(&LLParser::ExpandStatementList, this) },
 		{ "Synthesis Left curly bracket StatementList Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis Left curly bracket VariableDeclaration Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "", std::bind(&LLParser::abc, this) },
 	};
 
 	std::unordered_set<std::string> IGNORED_ACTION_NAMES {
