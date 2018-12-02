@@ -3,12 +3,14 @@
 
 #include "ArrayInformation/ArrayInformation.h"
 #include <string>
+#include <llvm/IR/Instructions.h>
 
 class SymbolTableRow
 {
 public:
 	std::string type;
 	std::string name;
+	llvm::AllocaInst * llvmAllocaInst;
 	ArrayInformation * arrayInformation = nullptr;
 };
 

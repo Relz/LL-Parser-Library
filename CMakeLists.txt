@@ -7,7 +7,16 @@ SET(SOURCE_FILES
 	LLParser.cpp
 	LLParser.h
 	AstNode/AstNode.cpp
-	AstNode/AstNode.h SymbolTable/SymbolTable.cpp SymbolTable/SymbolTable.h SymbolTable/SymbolTableRow/SymbolTableRow.cpp SymbolTable/SymbolTableRow/SymbolTableRow.h SymbolTable/SymbolTableRow/ArrayInformation/ArrayInformation.cpp SymbolTable/SymbolTableRow/ArrayInformation/ArrayInformation.h Calculator/Calculator.cpp Calculator/Calculator.h)
+	AstNode/AstNode.h
+	SymbolTable/SymbolTable.cpp
+	SymbolTable/SymbolTable.h
+	SymbolTable/SymbolTableRow/SymbolTableRow.cpp
+	SymbolTable/SymbolTableRow/SymbolTableRow.h
+	SymbolTable/SymbolTableRow/ArrayInformation/ArrayInformation.cpp
+	SymbolTable/SymbolTableRow/ArrayInformation/ArrayInformation.h
+	Calculator/Calculator.cpp Calculator/Calculator.h
+	LlvmHelper/LlvmHelper.cpp
+	LlvmHelper/LlvmHelper.h)
 
 ADD_LIBRARY(LLParserLibrary SHARED ${SOURCE_FILES})
 

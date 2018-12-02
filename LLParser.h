@@ -11,6 +11,7 @@
 #include <stack>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
+#include <llvm/IR/IRBuilder.h>
 
 class TokenInformation;
 
@@ -58,15 +59,19 @@ private:
 	bool RemoveSemicolon();
 	bool RemoveScopeBrackets();
 	bool ExpandStatementList();
+	bool RemoveBracketsAndSynthesis();
 	bool abc();
 
 	bool CreateLlvmIntegerValue();
 	bool CreateLlvmFloatValue();
-	bool SetLlvmValue(std::string const & type, std::string const & value, AstNode ** node);
 
 	void PrintColoredMessage(std::string const & message, std::string const & colorCode) const;
 	void PrintWarningMessage(std::string const & message) const;
 	void PrintErrorMessage(std::string const & message) const;
+
+	bool AreTypesCompatible(std::string const & lhsType, std::string const & rhsType, std::string & resultType);
+	bool IsUnaryMinus(std::string const & lhs);
+	AstNode * CreateLiteralAstNode(std::string const & type, std::string const & value);
 
 	std::unordered_map<std::string, std::function<bool()>> const ACTION_NAME_TO_ACTION_MAP {
 		{ "Create scope", std::bind(&LLParser::CreateScopeAction, this) },
@@ -224,13 +229,13 @@ private:
 		{ "Synthesis Float F", std::bind(&LLParser::SynthesisType, this) },
 		{ "Synthesis Identifier F", std::bind(&LLParser::SynthesisType, this) },
 
-		{ "Synthesis Left round bracket Integer Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
-		{ "Synthesis Left round bracket Float Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
-		{ "Synthesis Left round bracket Identifier Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
-		{ "Synthesis Left round bracket String Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
-		{ "Synthesis Left round bracket String literal Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
-		{ "Synthesis Left round bracket Character Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
-		{ "Synthesis Left round bracket Character literal Right round bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Left round bracket Integer Right round bracket", std::bind(&LLParser::RemoveBracketsAndSynthesis, this) },
+		{ "Synthesis Left round bracket Float Right round bracket", std::bind(&LLParser::RemoveBracketsAndSynthesis, this) },
+		{ "Synthesis Left round bracket Identifier Right round bracket", std::bind(&LLParser::RemoveBracketsAndSynthesis, this) },
+		{ "Synthesis Left round bracket String Right round bracket", std::bind(&LLParser::RemoveBracketsAndSynthesis, this) },
+		{ "Synthesis Left round bracket String literal Right round bracket", std::bind(&LLParser::RemoveBracketsAndSynthesis, this) },
+		{ "Synthesis Left round bracket Character Right round bracket", std::bind(&LLParser::RemoveBracketsAndSynthesis, this) },
+		{ "Synthesis Left round bracket Character literal Right round bracket", std::bind(&LLParser::RemoveBracketsAndSynthesis, this) },
 		{ "Synthesis If keyword Left round bracket Identifier Right round bracket Statement", std::bind(&LLParser::RemoveIfRoundBrackets, this) },
 		{ "Synthesis Assignment Semicolon", std::bind(&LLParser::RemoveSemicolon, this) },
 		{ "Synthesis VariableDeclaration Semicolon", std::bind(&LLParser::RemoveSemicolon, this) },
@@ -287,7 +292,11 @@ private:
 	std::vector<std::unordered_map<std::string, unsigned int>> m_scopes {{ }};
 	SymbolTable m_symbolTable;
 	llvm::LLVMContext m_context;
-	llvm::Module m_module;
+	llvm::Module * m_module;
+	llvm::FunctionType * m_mainFunctionType;
+	llvm::Function * m_mainFunction;
+	llvm::BasicBlock * m_mainBlock;
+	llvm::IRBuilder<> * m_builder;
 };
 
 #endif

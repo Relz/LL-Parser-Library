@@ -4,11 +4,16 @@
 #include <algorithm>
 
 unsigned int SymbolTable::CreateRow(
-	std::string const & type, std::string const & name, std::vector<unsigned int> const & dimensions)
+	std::string const & type,
+	std::string const & name,
+	llvm::AllocaInst * llvmAllocaInst,
+	std::vector<unsigned int> const & dimensions
+)
 {
 	SymbolTableRow symbolTableRow;
 	symbolTableRow.type = type;
 	symbolTableRow.name = name;
+	symbolTableRow.llvmAllocaInst = llvmAllocaInst;
 	if (!dimensions.empty())
 	{
 		ArrayInformation * arrayInformation = new ArrayInformation();
