@@ -12,6 +12,7 @@ public:
 	std::string type;
 	std::string computedType;
 	llvm::Value * llvmValue;
+	bool isTemporaryIdentifier = false;
 	std::vector<AstNode*> children;
 
 	std::string stringValue;

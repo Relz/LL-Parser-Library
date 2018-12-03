@@ -64,7 +64,11 @@ private:
 
 	bool CreateLlvmIntegerValue();
 	bool CreateLlvmFloatValue();
+	bool TryToSetLlvmValueFromSymbolTable();
 
+	void PrintTokenInformations(
+		std::vector<TokenInformation> const & tokenInformations, size_t from, size_t to, std::string const & color
+	);
 	void PrintColoredMessage(std::string const & message, std::string const & colorCode) const;
 	void PrintWarningMessage(std::string const & message) const;
 	void PrintErrorMessage(std::string const & message) const;
@@ -72,6 +76,7 @@ private:
 	bool AreTypesCompatible(std::string const & lhsType, std::string const & rhsType, std::string & resultType);
 	bool IsUnaryMinus(std::string const & lhs);
 	AstNode * CreateLiteralAstNode(std::string const & type, std::string const & value);
+	llvm::Function * PrintfPrototype();
 
 	std::unordered_map<std::string, std::function<bool()>> const ACTION_NAME_TO_ACTION_MAP {
 		{ "Create scope", std::bind(&LLParser::CreateScopeAction, this) },
@@ -84,6 +89,7 @@ private:
 		{ "Check identifier type with AssignmentRightHand type for equality", std::bind(&LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality, this) },
 		{ "Create llvm integer value", std::bind(&LLParser::CreateLlvmIntegerValue, this) },
 		{ "Create llvm float value", std::bind(&LLParser::CreateLlvmFloatValue, this) },
+		{ "Try to set LLVM value from symbol table", std::bind(&LLParser::TryToSetLlvmValueFromSymbolTable, this) },
 
 		{ "Synthesis Plus Integer", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus Integer B", std::bind(&LLParser::SynthesisPlus, this) },
@@ -292,7 +298,7 @@ private:
 	std::vector<std::unordered_map<std::string, unsigned int>> m_scopes {{ }};
 	SymbolTable m_symbolTable;
 	llvm::LLVMContext m_context;
-	llvm::Module * m_module;
+	std::unique_ptr<llvm::Module> m_module;
 	llvm::FunctionType * m_mainFunctionType;
 	llvm::Function * m_mainFunction;
 	llvm::BasicBlock * m_mainBlock;

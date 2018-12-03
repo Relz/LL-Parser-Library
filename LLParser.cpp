@@ -14,14 +14,18 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/ExecutionEngine/Interpreter.h>
+#include <llvm/Support/TargetSelect.h>
 
 LLParser::LLParser(std::string const & ruleFileName)
 	: m_llTableBuilder(ruleFileName)
 {
-	m_module = new llvm::Module("Main", m_context);
+	m_module = std::make_unique<llvm::Module>("Main", m_context);
 	std::vector<llvm::Type *> mainFunctionArgumentsTypes;
 	m_mainFunctionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(m_context), mainFunctionArgumentsTypes, false);
-	m_mainFunction = llvm::Function::Create(m_mainFunctionType, llvm::GlobalValue::ExternalLinkage, "main", m_module);
+	m_mainFunction = llvm::Function::Create(m_mainFunctionType, llvm::GlobalValue::ExternalLinkage, "main", m_module.get());
 	m_mainBlock = llvm::BasicBlock::Create(m_context, "main block", m_mainFunction, 0);
 	m_builder = new llvm::IRBuilder(m_context);
 	m_builder->SetInsertPoint(m_mainBlock);
@@ -166,8 +170,45 @@ bool LLParser::IsValid(
 	}
 	if (result)
 	{
+		std::cout << "\033[1;30;42m" << "--------------- Recode ---------------" << "\033[0m" << std::endl;
+		PrintTokenInformations(tokenInformations, 0, tokenInformations.size(), "32");
+		std::cout << "\n";
+		std::cout << "\033[1;30;42m" << "--------------------------------------" << "\033[0m" << std::endl;
+		std::cout << "         ⬇         ⬇         ⬇        " << std::endl;
+
+		llvm::Function * printfPrototype = LLParser::PrintfPrototype();
+		SymbolTableRow symbolTableRow;
+		if (m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName("resultInteger"), symbolTableRow))
+		{
+			std::vector<llvm::Value *> printfArguments {
+				m_builder->CreateGlobalStringPtr("%d\n", "decimal_format"),
+				m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, "(" + symbolTableRow.name + ")" + "_value")
+			};
+			m_builder->CreateCall(printfPrototype, printfArguments);
+		}
+		if (m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName("resultFloat"), symbolTableRow))
+		{
+			std::vector<llvm::Value *> printfArguments {
+				m_builder->CreateGlobalStringPtr("%g\n", "double_format"),
+				m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, "(" + symbolTableRow.name + ")" + "_value")
+			};
+			m_builder->CreateCall(printfPrototype, printfArguments);
+		}
+
 		m_builder->CreateRet(LlvmHelper::CreateIntegerConstant(m_context, 0));
+		std::cout << "\033[1;30;44m" << "------------ LLVM-IR Code ------------" << "\033[0m" << std::endl;
+		llvm::outs() << "\033[34m";
 		m_module->print(llvm::outs(), nullptr);
+		std::cout << "\033[1;30;44m" << "--------------------------------------" << "\033[0m" << std::endl;
+		std::cout << "         ⬇         ⬇         ⬇        " << std::endl;
+
+		std::string errStr;
+		llvm::ExecutionEngine * engine = llvm::EngineBuilder(std::move(m_module)).setErrorStr(&errStr).create();
+		engine->finalizeObject();
+		std::cout << "\033[1;30;47m" << "-------- Executed LLVM-IR Code -------" << "\033[0m" << std::endl;
+		std::cout << "\033[37m";
+		engine->runFunction(m_mainFunction, std::vector<llvm::GenericValue>());
+		std::cout << "\033[1;30;47m" << "--------------------------------------" << "\033[0m" << std::endl;
 	}
 	return result;
 }
@@ -290,7 +331,7 @@ unsigned int LLParser::FindRowIndexInScopeByName(std::string const & name) const
 			return scope.find(name) != scope.end();
 		}
 	);
-	return it->at(name);
+	return it->empty() ? -1 : it->at(name);
 }
 
 bool LLParser::CreateScopeAction()
@@ -325,7 +366,7 @@ bool LLParser::AddVariableToScope()
 	std::vector<unsigned int> dimensions;
 	computeDimensions(dimensions);
 	llvm::Type * llvmType = LlvmHelper::CreateType(m_context, variableType);
-	llvm::AllocaInst * llvmAllocaInst = m_builder->CreateAlloca(llvmType, 0, variableName + "_pointer");
+	llvm::AllocaInst * llvmAllocaInst = m_builder->CreateAlloca(llvmType, 0, "(" + variableName + ")" + "_pointer");
 	m_builder->CreateStore(m_ast.back()->llvmValue, llvmAllocaInst);
 	m_scopes.back()[variableName] = m_symbolTable.CreateRow(variableType, variableName, llvmAllocaInst, dimensions);
 
@@ -378,14 +419,7 @@ bool LLParser::SynthesisPlus()
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (lhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
-			lhsType = symbolTableRow.type;
-			lhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			lhsType = lhsNode->computedType;
 		}
@@ -396,14 +430,7 @@ bool LLParser::SynthesisPlus()
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
-			rhsType = symbolTableRow.type;
-			rhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			rhsType = rhsNode->computedType;
 		}
@@ -419,14 +446,15 @@ bool LLParser::SynthesisPlus()
 	}
 	if (identifiersExists)
 	{
-		llvm::Value * lhsLlvmValue = lhsNode->type == TokenConstant::Name::IDENTIFIER
+		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
 			? m_builder->CreateLoad(lhsNode->llvmValue, lhsNode->stringValue + "_value")
 			: lhsNode->llvmValue;
-		llvm::Value * rhsLlvmValue = rhsNode->type == TokenConstant::Name::IDENTIFIER
-			? m_builder->CreateLoad(rhsNode->llvmValue, lhsNode->stringValue + "_value")
+		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(rhsNode->llvmValue, rhsNode->stringValue + "_value")
 			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
-		lhsNode->stringValue = lhs + " + " + rhs;
+		lhsNode->stringValue = "(" + lhs + " + " + rhs + ")";
+		lhsNode->isTemporaryIdentifier = true;
 		lhsNode->llvmValue = LlvmHelper::CreateAdd(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
 	}
 	else
@@ -459,14 +487,7 @@ bool LLParser::SynthesisMinus()
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (lhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
-			lhsType = symbolTableRow.type;
-			lhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			lhsType = lhsNode->computedType;
 		}
@@ -477,14 +498,7 @@ bool LLParser::SynthesisMinus()
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
-			rhsType = symbolTableRow.type;
-			rhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			rhsType = rhsNode->computedType;
 		}
@@ -509,9 +523,16 @@ bool LLParser::SynthesisMinus()
 	}
 	if (identifiersExists)
 	{
+		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
+			: lhsNode->llvmValue;
+		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
+			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
-		lhsNode->stringValue = lhs + " - " + rhs;
-		lhsNode->llvmValue = LlvmHelper::CreateSub(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+		lhsNode->stringValue = "(" + lhs + " - " + rhs + ")";
+		lhsNode->isTemporaryIdentifier = true;
+		lhsNode->llvmValue = LlvmHelper::CreateSub(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -547,14 +568,7 @@ bool LLParser::SynthesisMultiply()
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (lhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
-			lhsType = symbolTableRow.type;
-			lhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			lhsType = lhsNode->computedType;
 		}
@@ -565,14 +579,7 @@ bool LLParser::SynthesisMultiply()
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
-			rhsType = symbolTableRow.type;
-			rhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			rhsType = rhsNode->computedType;
 		}
@@ -589,9 +596,16 @@ bool LLParser::SynthesisMultiply()
 
 	if (identifiersExists)
 	{
+		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
+			: lhsNode->llvmValue;
+		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
+			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
-		lhsNode->stringValue = lhs + " * " + rhs;
-		lhsNode->llvmValue = LlvmHelper::CreateMul(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+		lhsNode->stringValue = "(" + lhs + " * " + rhs + ")";
+		lhsNode->isTemporaryIdentifier = true;
+		lhsNode->llvmValue = LlvmHelper::CreateMul(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -623,14 +637,7 @@ bool LLParser::SynthesisIntegerDivision()
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (lhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
-			lhsType = symbolTableRow.type;
-			lhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			lhsType = lhsNode->computedType;
 		}
@@ -641,14 +648,7 @@ bool LLParser::SynthesisIntegerDivision()
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
-			rhsType = symbolTableRow.type;
-			rhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			rhsType = rhsNode->computedType;
 		}
@@ -665,9 +665,16 @@ bool LLParser::SynthesisIntegerDivision()
 
 	if (identifiersExists)
 	{
+		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
+			: lhsNode->llvmValue;
+		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
+			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
-		lhsNode->stringValue = lhs + " // " + rhs;
-		lhsNode->llvmValue = LlvmHelper::CreateSDiv(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+		lhsNode->stringValue = "(" + lhs + " // " + rhs + ")";
+		lhsNode->isTemporaryIdentifier = true;
+		lhsNode->llvmValue = LlvmHelper::CreateExactSDiv(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -699,14 +706,7 @@ bool LLParser::SynthesisDivision()
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (lhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
-			lhsType = symbolTableRow.type;
-			lhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			lhsType = lhsNode->computedType;
 		}
@@ -717,14 +717,7 @@ bool LLParser::SynthesisDivision()
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
-			rhsType = symbolTableRow.type;
-			rhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			rhsType = rhsNode->computedType;
 		}
@@ -741,9 +734,16 @@ bool LLParser::SynthesisDivision()
 
 	if (identifiersExists)
 	{
+		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
+			: lhsNode->llvmValue;
+		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
+			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
-		lhsNode->stringValue = lhs + " / " + rhs;
-		lhsNode->llvmValue = LlvmHelper::CreateExactSDiv(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+		lhsNode->stringValue = "(" + lhs + " / " + rhs + ")";
+		lhsNode->isTemporaryIdentifier = true;
+		lhsNode->llvmValue = LlvmHelper::CreateSDiv(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -775,14 +775,7 @@ bool LLParser::SynthesisModulus()
 	if (lhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (lhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(lhs), symbolTableRow);
-			lhsType = symbolTableRow.type;
-			lhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			lhsType = lhsNode->computedType;
 		}
@@ -793,14 +786,7 @@ bool LLParser::SynthesisModulus()
 	if (rhsType == TokenConstant::Name::IDENTIFIER)
 	{
 		identifiersExists = true;
-		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
-		{
-			SymbolTableRow symbolTableRow;
-			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rhs), symbolTableRow);
-			rhsType = symbolTableRow.type;
-			rhsNode->llvmValue = symbolTableRow.llvmAllocaInst;
-		}
-		else
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
 		{
 			rhsType = rhsNode->computedType;
 		}
@@ -817,9 +803,16 @@ bool LLParser::SynthesisModulus()
 
 	if (identifiersExists)
 	{
+		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
+			: lhsNode->llvmValue;
+		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
+			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
+			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = lhs + " % " + rhs;
-		lhsNode->llvmValue = LlvmHelper::CreateSRem(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+		lhsNode->isTemporaryIdentifier = true;
+		lhsNode->llvmValue = LlvmHelper::CreateSRem(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -996,7 +989,7 @@ bool LLParser::ExpandStatementList()
 bool LLParser::CreateLlvmIntegerValue()
 {
 	AstNode * astNode = m_ast.back();
-	astNode->llvmValue = llvm::ConstantInt::get(llvm::IntegerType::getInt32Ty(m_context), std::stoi(astNode->stringValue), true);
+	astNode->llvmValue = LlvmHelper::CreateIntegerConstant(m_context, std::stoi(astNode->stringValue));
 
 	return true;
 }
@@ -1004,7 +997,18 @@ bool LLParser::CreateLlvmIntegerValue()
 bool LLParser::CreateLlvmFloatValue()
 {
 	AstNode * astNode = m_ast.back();
-	astNode->llvmValue = llvm::ConstantFP::get(m_context, llvm::APFloat(std::stof(astNode->stringValue)));
+	astNode->llvmValue = LlvmHelper::CreateFloatConstant(m_context, std::stod(astNode->stringValue));
+
+	return true;
+}
+
+bool LLParser::TryToSetLlvmValueFromSymbolTable()
+{
+	AstNode * astNode = m_ast.back();
+	SymbolTableRow symbolTableRow;
+	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->stringValue), symbolTableRow);
+	astNode->computedType = symbolTableRow.type;
+	astNode->llvmValue = m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, symbolTableRow.name + "_value");
 
 	return true;
 }
@@ -1018,6 +1022,60 @@ void LLParser::PrintColoredMessage(std::string const & message, std::string cons
 {
 	std::cout << "\033[" + colorCode + "m";
 	std::cout << message;
+	std::cout << "\033[m";
+}
+
+void LLParser::PrintTokenInformations(
+	std::vector<TokenInformation> const & tokenInformations, size_t from, size_t to, std::string const & color
+)
+{
+	std::cout << "\033[" + color + "m";
+	StreamPosition outputStreamPosition;
+	if (from > 0)
+	{
+		StreamString previousStreamString = tokenInformations.at(from - 1).GetTokenStreamString();
+		outputStreamPosition = previousStreamString.position;
+		outputStreamPosition.IncreaseColumn(previousStreamString.string.length());
+	}
+
+	for (
+			size_t i = from; i < to && i < tokenInformations.size(); ++i
+			)
+	{
+		TokenInformation const & tokenInformation = tokenInformations.at(i);
+		StreamString const & streamString = tokenInformation.GetTokenStreamString();
+		std::string const & streamStringString = streamString.string;
+		StreamPosition const & streamPosition = streamString.position;
+		long const & line = streamPosition.GetLine();
+		long const & column = streamPosition.GetColumn();
+		while (line > outputStreamPosition.GetLine())
+		{
+			std::cout << "\n";
+			outputStreamPosition.IncreaseLine();
+			outputStreamPosition.SetColumn(1);
+		}
+		char const indentCharacter = outputStreamPosition.GetColumn() == 1 ? '\t' : ' ';
+		while (column > outputStreamPosition.GetColumn())
+		{
+			std::cout << indentCharacter;
+			outputStreamPosition.IncreaseColumn();
+		}
+		for (
+			char ch : streamStringString
+				)
+		{
+			std::cout << ch;
+			if (ch == '\n' || ch == '\r')
+			{
+				outputStreamPosition.IncreaseLine();
+				outputStreamPosition.SetColumn(1);
+			}
+			else
+			{
+				outputStreamPosition.IncreaseColumn();
+			}
+		}
+	}
 	std::cout << "\033[m";
 }
 
@@ -1100,6 +1158,16 @@ AstNode * LLParser::CreateLiteralAstNode(std::string const & type, std::string c
 	result->computedType = type;
 	result->stringValue = value;
 	result->llvmValue = LlvmHelper::CreateConstant(m_context, type, value);
+
+	return result;
+}
+
+llvm::Function * LLParser::PrintfPrototype()
+{
+	std::vector<llvm::Type *> argumentsTypes { llvm::Type::getInt8PtrTy(m_context) };
+	llvm::FunctionType * type = llvm::FunctionType::get(llvm::Type::getInt32Ty(m_context), argumentsTypes, true);
+	llvm::Function * result = llvm::Function::Create(type, llvm::Function::ExternalLinkage, "printf", m_module.get());
+	result->setCallingConv(llvm::CallingConv::C);
 
 	return result;
 }

@@ -4,24 +4,36 @@
 
 llvm::Type * LlvmHelper::CreateType(llvm::LLVMContext & context, std::string const & type)
 {
-	if (type == TokenConstant::Name::INTEGER)
+	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
 		return llvm::Type::getInt32Ty(context);
 	}
-	else if (type == TokenConstant::Name::FLOAT)
+	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
-		return llvm::Type::getFloatTy(context);
+		return llvm::Type::getDoubleTy(context);
+	}
+	else if (type == TokenConstant::CoreType::CHARACTER)
+	{
+		return llvm::ArrayType::getInt8Ty(context);
+	}
+	else if (type == TokenConstant::CoreType::BOOLEAN)
+	{
+		return llvm::ArrayType::getInt8Ty(context);
+	}
+	else if (type == TokenConstant::CoreType::VOID)
+	{
+		return llvm::ArrayType::getVoidTy(context);
 	}
 	throw std::runtime_error("LlvmHelper::CreateType: Unsupported type \"" + type + "\"");
 }
 
 llvm::Constant * LlvmHelper::CreateConstant(llvm::LLVMContext & context, std::string const & type, std::string const & value)
 {
-	if (type == TokenConstant::Name::INTEGER)
+	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
 		return LlvmHelper::CreateIntegerConstant(context, std::stoi(value));
 	}
-	else if (type == TokenConstant::Name::FLOAT)
+	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
 		return LlvmHelper::CreateFloatConstant(context, std::stof(value));
 	}
@@ -33,18 +45,18 @@ llvm::Constant * LlvmHelper::CreateIntegerConstant(llvm::LLVMContext & context, 
 	return llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), value, true);
 }
 
-llvm::Constant * LlvmHelper::CreateFloatConstant(llvm::LLVMContext & context, float value)
+llvm::Constant * LlvmHelper::CreateFloatConstant(llvm::LLVMContext & context, double value)
 {
-	return llvm::ConstantFP::get(llvm::Type::getFloatTy(context), value);
+	return llvm::ConstantFP::get(llvm::Type::getDoubleTy(context), value);
 }
 
 llvm::Value * LlvmHelper::CreateAdd(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name)
 {
-	if (type == TokenConstant::Name::INTEGER)
+	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
 		return builder->CreateAdd(lhs, rhs, name);
 	}
-	else if (type == TokenConstant::Name::FLOAT)
+	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
 		return builder->CreateFAdd(lhs, rhs, name);
 	}
@@ -53,11 +65,11 @@ llvm::Value * LlvmHelper::CreateAdd(llvm::IRBuilder<> * builder, std::string con
 
 llvm::Value * LlvmHelper::CreateSub(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name)
 {
-	if (type == TokenConstant::Name::INTEGER)
+	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
 		return builder->CreateSub(lhs, rhs, name);
 	}
-	else if (type == TokenConstant::Name::FLOAT)
+	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
 		return builder->CreateFSub(lhs, rhs, name);
 	}
@@ -66,11 +78,11 @@ llvm::Value * LlvmHelper::CreateSub(llvm::IRBuilder<> * builder, std::string con
 
 llvm::Value * LlvmHelper::CreateMul(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name)
 {
-	if (type == TokenConstant::Name::INTEGER)
+	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
 		return builder->CreateMul(lhs, rhs, name);
 	}
-	else if (type == TokenConstant::Name::FLOAT)
+	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
 		return builder->CreateFMul(lhs, rhs, name);
 	}
@@ -79,7 +91,7 @@ llvm::Value * LlvmHelper::CreateMul(llvm::IRBuilder<> * builder, std::string con
 
 llvm::Value * LlvmHelper::CreateSDiv(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name)
 {
-	if (type == TokenConstant::Name::FLOAT)
+	if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
 		return builder->CreateSDiv(lhs, rhs, name);
 	}
@@ -88,7 +100,7 @@ llvm::Value * LlvmHelper::CreateSDiv(llvm::IRBuilder<> * builder, std::string co
 
 llvm::Value * LlvmHelper::CreateExactSDiv(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name)
 {
-	if (type == TokenConstant::Name::INTEGER)
+	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
 		return builder->CreateExactSDiv(lhs, rhs, name);
 	}
@@ -97,7 +109,7 @@ llvm::Value * LlvmHelper::CreateExactSDiv(llvm::IRBuilder<> * builder, std::stri
 
 llvm::Value * LlvmHelper::CreateSRem(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name)
 {
-	if (type == TokenConstant::Name::INTEGER)
+	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
 		return builder->CreateSRem(lhs, rhs, name);
 	}
