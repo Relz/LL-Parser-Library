@@ -176,25 +176,6 @@ bool LLParser::IsValid(
 		std::cout << "\033[1;30;42m" << "--------------------------------------" << "\033[0m" << std::endl;
 		std::cout << "         ⬇         ⬇         ⬇        " << std::endl;
 
-		llvm::Function * printfPrototype = LLParser::PrintfPrototype();
-		SymbolTableRow symbolTableRow;
-		if (m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName("resultInteger"), symbolTableRow))
-		{
-			std::vector<llvm::Value *> printfArguments {
-				m_builder->CreateGlobalStringPtr("%d\n", "decimal_format"),
-				m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, "(" + symbolTableRow.name + ")" + "_value")
-			};
-			m_builder->CreateCall(printfPrototype, printfArguments);
-		}
-		if (m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName("resultFloat"), symbolTableRow))
-		{
-			std::vector<llvm::Value *> printfArguments {
-				m_builder->CreateGlobalStringPtr("%g\n", "double_format"),
-				m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, "(" + symbolTableRow.name + ")" + "_value")
-			};
-			m_builder->CreateCall(printfPrototype, printfArguments);
-		}
-
 		m_builder->CreateRet(LlvmHelper::CreateIntegerConstant(m_context, 0));
 		std::cout << "\033[1;30;44m" << "------------ LLVM-IR Code ------------" << "\033[0m" << std::endl;
 		llvm::outs() << "\033[34m";
@@ -446,16 +427,10 @@ bool LLParser::SynthesisPlus()
 	}
 	if (identifiersExists)
 	{
-		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(lhsNode->llvmValue, lhsNode->stringValue + "_value")
-			: lhsNode->llvmValue;
-		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(rhsNode->llvmValue, rhsNode->stringValue + "_value")
-			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = "(" + lhs + " + " + rhs + ")";
 		lhsNode->isTemporaryIdentifier = true;
-		lhsNode->llvmValue = LlvmHelper::CreateAdd(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
+		lhsNode->llvmValue = LlvmHelper::CreateAdd(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -523,16 +498,10 @@ bool LLParser::SynthesisMinus()
 	}
 	if (identifiersExists)
 	{
-		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
-			: lhsNode->llvmValue;
-		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
-			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = "(" + lhs + " - " + rhs + ")";
 		lhsNode->isTemporaryIdentifier = true;
-		lhsNode->llvmValue = LlvmHelper::CreateSub(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
+		lhsNode->llvmValue = LlvmHelper::CreateSub(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -596,16 +565,10 @@ bool LLParser::SynthesisMultiply()
 
 	if (identifiersExists)
 	{
-		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
-			: lhsNode->llvmValue;
-		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
-			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = "(" + lhs + " * " + rhs + ")";
 		lhsNode->isTemporaryIdentifier = true;
-		lhsNode->llvmValue = LlvmHelper::CreateMul(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
+		lhsNode->llvmValue = LlvmHelper::CreateMul(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -665,16 +628,10 @@ bool LLParser::SynthesisIntegerDivision()
 
 	if (identifiersExists)
 	{
-		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
-			: lhsNode->llvmValue;
-		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
-			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = "(" + lhs + " // " + rhs + ")";
 		lhsNode->isTemporaryIdentifier = true;
-		lhsNode->llvmValue = LlvmHelper::CreateExactSDiv(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
+		lhsNode->llvmValue = LlvmHelper::CreateExactSDiv(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -734,16 +691,10 @@ bool LLParser::SynthesisDivision()
 
 	if (identifiersExists)
 	{
-		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
-			: lhsNode->llvmValue;
-		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
-			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = "(" + lhs + " / " + rhs + ")";
 		lhsNode->isTemporaryIdentifier = true;
-		lhsNode->llvmValue = LlvmHelper::CreateSDiv(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
+		lhsNode->llvmValue = LlvmHelper::CreateSDiv(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -803,16 +754,10 @@ bool LLParser::SynthesisModulus()
 
 	if (identifiersExists)
 	{
-		llvm::Value * lhsLlvmValue = false && lhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(lhsNode->llvmValue, "(" + lhsNode->stringValue + ")" + "_value")
-			: lhsNode->llvmValue;
-		llvm::Value * rhsLlvmValue = false && rhsNode->type == TokenConstant::Name::IDENTIFIER && !lhsNode->isTemporaryIdentifier
-			? m_builder->CreateLoad(rhsNode->llvmValue, "(" + rhsNode->stringValue + ")" + "_value")
-			: rhsNode->llvmValue;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = lhs + " % " + rhs;
 		lhsNode->isTemporaryIdentifier = true;
-		lhsNode->llvmValue = LlvmHelper::CreateSRem(m_builder, resultType, lhsLlvmValue, rhsLlvmValue, lhsNode->stringValue);
+		lhsNode->llvmValue = LlvmHelper::CreateSRem(m_builder, resultType, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
 	}
 	else
 	{
@@ -975,14 +920,59 @@ bool LLParser::RemoveScopeBrackets()
 	return true;
 }
 
-bool LLParser::ExpandStatementList()
+bool LLParser::ExpandChildrenLastChildren()
 {
-	std::vector<AstNode*> const & children = m_ast.back()->children.back()->children;
-	m_ast.back()->children.pop_back();
-	for (AstNode* child : children)
+	std::vector<AstNode*> & children = m_ast.back()->children;
+	std::vector<AstNode*> const & childrenLastChildred = children.back()->children;
+	children.pop_back();
+	children.insert(children.end(), childrenLastChildred.begin(), childrenLastChildred.end());
+
+	return true;
+}
+
+bool LLParser::CreateLlvmStringLiteral()
+{
+	AstNode * astNode = m_ast.back();
+	std::string stringLiteral;
+	for (size_t i = 1; i < astNode->stringValue.length() - 1; ++i)
 	{
-		m_ast.back()->children.emplace_back(child);
+		if (astNode->stringValue[i] == '\\')
+		{
+			char nextCharAfterSlash = astNode->stringValue[i + 1];
+			if (nextCharAfterSlash == 'n')
+			{
+				stringLiteral += "\n";
+			}
+			else if (nextCharAfterSlash == 't')
+			{
+				stringLiteral += "\t";
+			}
+			++i;
+		}
+		else
+		{
+			stringLiteral += astNode->stringValue[i];
+		}
 	}
+	std::string name = astNode->name + ": `" + stringLiteral + "`";
+	astNode->llvmValue = m_builder->CreateGlobalStringPtr(stringLiteral, name);
+
+	return true;
+}
+
+bool LLParser::CreateLlvmCharacterLiteral()
+{
+	AstNode * astNode = m_ast.back();
+	astNode->llvmValue = LlvmHelper::CreateCharacterConstant(m_context, astNode->stringValue[1]);
+
+	return true;
+}
+
+bool LLParser::CreateLlvmBooleanLiteral()
+{
+	AstNode * astNode = m_ast.back();
+	astNode->llvmValue = LlvmHelper::CreateBooleanConstant(m_context, astNode->stringValue);
+
 	return true;
 }
 
@@ -1009,6 +999,47 @@ bool LLParser::TryToSetLlvmValueFromSymbolTable()
 	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->stringValue), symbolTableRow);
 	astNode->computedType = symbolTableRow.type;
 	astNode->llvmValue = m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, symbolTableRow.name + "_value");
+
+	return true;
+}
+
+bool LLParser::RemoveComma()
+{
+	std::vector<AstNode*> & identifierListChildren = m_ast.back()->children;
+	identifierListChildren.erase(identifierListChildren.begin());
+
+	return true;
+}
+
+bool LLParser::RemovePredefinedFunctionWriteExtra()
+{
+	AstNode * writeContainer = m_ast.back();
+	AstNode * writeFunction = writeContainer->children.front();
+	AstNode * formatString = writeContainer->children[2];
+	std::vector<AstNode*> const & writeParameters = writeContainer->children[3]->children;
+	writeFunction->children.emplace_back(formatString);
+	writeFunction->children.insert(writeFunction->children.end(), writeParameters.begin(), writeParameters.end());
+	m_ast.back() = writeFunction;
+
+	return true;
+}
+
+bool LLParser::CreateLllvmWriteFunction()
+{
+	std::vector<AstNode*> & writeFunctionParameters = m_ast.back()->children;
+	std::vector<llvm::Value *> printfArguments;
+	for (AstNode * writeFunctionParameter : writeFunctionParameters)
+	{
+		printfArguments.emplace_back(writeFunctionParameter->llvmValue);
+	}
+	m_builder->CreateCall(LLParser::PrintfPrototype(m_context, m_module.get()), printfArguments);
+
+	return true;
+}
+
+bool LLParser::SynthesisLastChildrenChildren()
+{
+	m_ast.back()->children = m_ast.back()->children.back()->children;
 
 	return true;
 }
@@ -1147,7 +1178,8 @@ return lhs == TokenConstant::Operator::Assignment::ASSIGNMENT
 	|| lhs == TokenConstant::Operator::Arithmetic::MULTIPLY
 	|| lhs == TokenConstant::Operator::Assignment::MULTIPLY_ASSIGNMENT
 	|| lhs == TokenConstant::Operator::Arithmetic::PLUS
-	|| lhs == TokenConstant::Operator::Assignment::PLUS_ASSIGNMENT;
+	|| lhs == TokenConstant::Operator::Assignment::PLUS_ASSIGNMENT
+	|| lhs == TokenConstant::Parentheses::ROUND_BRACKET.LEFT;
 }
 
 AstNode * LLParser::CreateLiteralAstNode(std::string const & type, std::string const & value)
@@ -1162,11 +1194,11 @@ AstNode * LLParser::CreateLiteralAstNode(std::string const & type, std::string c
 	return result;
 }
 
-llvm::Function * LLParser::PrintfPrototype()
+llvm::Function * LLParser::PrintfPrototype(llvm::LLVMContext & context, llvm::Module * module)
 {
-	std::vector<llvm::Type *> argumentsTypes { llvm::Type::getInt8PtrTy(m_context) };
-	llvm::FunctionType * type = llvm::FunctionType::get(llvm::Type::getInt32Ty(m_context), argumentsTypes, true);
-	llvm::Function * result = llvm::Function::Create(type, llvm::Function::ExternalLinkage, "printf", m_module.get());
+	static std::vector<llvm::Type *> argumentsTypes { llvm::Type::getInt8PtrTy(context) };
+	static llvm::FunctionType * type = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), argumentsTypes, true);
+	static llvm::Function * result = llvm::Function::Create(type, llvm::Function::ExternalLinkage, "printf", module);
 	result->setCallingConv(llvm::CallingConv::C);
 
 	return result;

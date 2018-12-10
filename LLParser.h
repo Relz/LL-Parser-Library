@@ -58,10 +58,17 @@ private:
 	bool RemoveIfRoundBrackets();
 	bool RemoveSemicolon();
 	bool RemoveScopeBrackets();
-	bool ExpandStatementList();
+	bool ExpandChildrenLastChildren();
 	bool RemoveBracketsAndSynthesis();
+	bool RemoveComma();
+	bool RemovePredefinedFunctionWriteExtra();
+	bool CreateLllvmWriteFunction();
+	bool SynthesisLastChildrenChildren();
 	bool abc();
 
+	bool CreateLlvmStringLiteral();
+	bool CreateLlvmCharacterLiteral();
+	bool CreateLlvmBooleanLiteral();
 	bool CreateLlvmIntegerValue();
 	bool CreateLlvmFloatValue();
 	bool TryToSetLlvmValueFromSymbolTable();
@@ -76,7 +83,7 @@ private:
 	bool AreTypesCompatible(std::string const & lhsType, std::string const & rhsType, std::string & resultType);
 	bool IsUnaryMinus(std::string const & lhs);
 	AstNode * CreateLiteralAstNode(std::string const & type, std::string const & value);
-	llvm::Function * PrintfPrototype();
+	static llvm::Function * PrintfPrototype(llvm::LLVMContext & context, llvm::Module * module);
 
 	std::unordered_map<std::string, std::function<bool()>> const ACTION_NAME_TO_ACTION_MAP {
 		{ "Create scope", std::bind(&LLParser::CreateScopeAction, this) },
@@ -87,9 +94,13 @@ private:
 		{ "Synthesis", std::bind(&LLParser::Synthesis, this) },
 		{ "Check variable type with AssignmentRightHand type for equality", std::bind(&LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality, this) },
 		{ "Check identifier type with AssignmentRightHand type for equality", std::bind(&LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality, this) },
+		{ "Create LLVM string literal", std::bind(&LLParser::CreateLlvmStringLiteral, this) },
+		{ "Create LLVM character literal", std::bind(&LLParser::CreateLlvmCharacterLiteral, this) },
+		{ "Create LLVM boolean literal", std::bind(&LLParser::CreateLlvmBooleanLiteral, this) },
 		{ "Create llvm integer value", std::bind(&LLParser::CreateLlvmIntegerValue, this) },
 		{ "Create llvm float value", std::bind(&LLParser::CreateLlvmFloatValue, this) },
 		{ "Try to set LLVM value from symbol table", std::bind(&LLParser::TryToSetLlvmValueFromSymbolTable, this) },
+		{ "Create LLVM write function", std::bind(&LLParser::CreateLllvmWriteFunction, this) },
 
 		{ "Synthesis Plus Integer", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus Integer B", std::bind(&LLParser::SynthesisPlus, this) },
@@ -247,10 +258,14 @@ private:
 		{ "Synthesis VariableDeclaration Semicolon", std::bind(&LLParser::RemoveSemicolon, this) },
 		{ "Synthesis Left curly bracket Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis VariableDeclaration StatementList Right curly bracket", std::bind(&LLParser::RemoveScopeBrackets, this) },
-		{ "Synthesis VariableDeclaration StatementList", std::bind(&LLParser::ExpandStatementList, this) },
-		{ "Synthesis Assignment StatementList", std::bind(&LLParser::ExpandStatementList, this) },
+		{ "Synthesis VariableDeclaration StatementList", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Assignment StatementList", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Left curly bracket StatementList Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis Left curly bracket VariableDeclaration Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Identifier IdentifierListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Comma Identifier", std::bind(&LLParser::RemoveComma, this) },
+		{ "Synthesis Write function Left round bracket String literal WriteExtra Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionWriteExtra, this) },
+		{ "Synthesis Comma IdentifierList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
 		{ "", std::bind(&LLParser::abc, this) },
 	};
 
@@ -285,11 +300,13 @@ private:
 		"Synthesis Assignment Identifier ArithmeticNegate",
 		"Synthesis VariableDeclaration VariableDeclaration",
 		"Synthesis VariableDeclaration If",
+		"Synthesis VariableDeclaration Write function"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
 		{ TokenConstant::CoreType::Complex::STRING, { TokenConstant::Name::STRING_LITERAL }},
 		{ TokenConstant::CoreType::CHARACTER, { TokenConstant::Name::CHARACTER_LITERAL }},
+		{ TokenConstant::CoreType::BOOLEAN, { TokenConstant::Name::BOOLEAN_LITERAL }},
 		{ TokenConstant::CoreType::Number::FLOAT, { TokenConstant::CoreType::Number::INTEGER }}
 	};
 

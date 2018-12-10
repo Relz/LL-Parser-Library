@@ -10,6 +10,9 @@ class LlvmHelper
 public:
 	static llvm::Type * CreateType(llvm::LLVMContext & context, std::string const & type);
 	static llvm::Constant * CreateConstant(llvm::LLVMContext & context, std::string const & type, std::string const & value);
+	static llvm::Constant * CreateBooleanConstant(llvm::LLVMContext & context, bool value);
+	static llvm::Constant * CreateBooleanConstant(llvm::LLVMContext & context, std::string const & value);
+	static llvm::Constant * CreateCharacterConstant(llvm::LLVMContext & context, char value);
 	static llvm::Constant * CreateIntegerConstant(llvm::LLVMContext & context, int value);
 	static llvm::Constant * CreateFloatConstant(llvm::LLVMContext & context, double value);
 	static llvm::Value * CreateAdd(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name);

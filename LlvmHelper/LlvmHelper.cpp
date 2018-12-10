@@ -14,15 +14,19 @@ llvm::Type * LlvmHelper::CreateType(llvm::LLVMContext & context, std::string con
 	}
 	else if (type == TokenConstant::CoreType::CHARACTER)
 	{
-		return llvm::ArrayType::getInt8Ty(context);
+		return llvm::Type::getInt8Ty(context);
 	}
 	else if (type == TokenConstant::CoreType::BOOLEAN)
 	{
-		return llvm::ArrayType::getInt8Ty(context);
+		return llvm::Type::getInt8Ty(context);
 	}
 	else if (type == TokenConstant::CoreType::VOID)
 	{
-		return llvm::ArrayType::getVoidTy(context);
+		return llvm::Type::getVoidTy(context);
+	}
+	else if (type == TokenConstant::CoreType::Complex::STRING)
+	{
+		return llvm::ArrayType::getInt8PtrTy(context);
 	}
 	throw std::runtime_error("LlvmHelper::CreateType: Unsupported type \"" + type + "\"");
 }
@@ -37,7 +41,38 @@ llvm::Constant * LlvmHelper::CreateConstant(llvm::LLVMContext & context, std::st
 	{
 		return LlvmHelper::CreateFloatConstant(context, std::stof(value));
 	}
+	else if (type == TokenConstant::CoreType::BOOLEAN)
+	{
+		return LlvmHelper::CreateBooleanConstant(context, value);
+	}
+	else if (type == TokenConstant::CoreType::CHARACTER)
+	{
+		return LlvmHelper::CreateCharacterConstant(context, value[1]);
+	}
 	throw std::runtime_error("LlvmHelper::CreateConstant: Unsupported type \"" + type + "\"");
+}
+
+llvm::Constant * LlvmHelper::CreateBooleanConstant(llvm::LLVMContext & context, bool value)
+{
+	return llvm::ConstantInt::get(llvm::Type::getInt1Ty(context), value, false);
+}
+
+llvm::Constant * LlvmHelper::CreateBooleanConstant(llvm::LLVMContext & context, std::string const & value)
+{
+	if (value == "True")
+	{
+		return LlvmHelper::CreateBooleanConstant(context, true);
+	}
+	else if (value == "False")
+	{
+		return LlvmHelper::CreateBooleanConstant(context, false);
+	}
+	throw std::runtime_error("LlvmHelper::CreateConstant: \"" + value + "\"" + " is not boolean literal, possible values: \"True\", \"False\"");
+}
+
+llvm::Constant * LlvmHelper::CreateCharacterConstant(llvm::LLVMContext & context, char value)
+{
+	return llvm::ConstantInt::get(llvm::Type::getInt8Ty(context), value, false);
 }
 
 llvm::Constant * LlvmHelper::CreateIntegerConstant(llvm::LLVMContext & context, int value)
