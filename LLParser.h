@@ -61,7 +61,8 @@ private:
 	bool ExpandChildrenLastChildren();
 	bool RemoveBracketsAndSynthesis();
 	bool RemoveComma();
-	bool RemovePredefinedFunctionWriteExtra();
+	bool RemovePredefinedFunctionReadOrWriteExtra();
+	bool CreateLllvmReadFunction();
 	bool CreateLllvmWriteFunction();
 	bool SynthesisLastChildrenChildren();
 	bool abc();
@@ -71,7 +72,8 @@ private:
 	bool CreateLlvmBooleanLiteral();
 	bool CreateLlvmIntegerValue();
 	bool CreateLlvmFloatValue();
-	bool TryToSetLlvmValueFromSymbolTable();
+	bool TryToLoadLlvmValueFromSymbolTable();
+	bool TryToReferenceLlvmValueFromSymbolTable();
 
 	void PrintTokenInformations(
 		std::vector<TokenInformation> const & tokenInformations, size_t from, size_t to, std::string const & color
@@ -84,6 +86,7 @@ private:
 	bool IsUnaryMinus(std::string const & lhs);
 	AstNode * CreateLiteralAstNode(std::string const & type, std::string const & value);
 	static llvm::Function * PrintfPrototype(llvm::LLVMContext & context, llvm::Module * module);
+	static llvm::Function * ScanfPrototype(llvm::LLVMContext & context, llvm::Module * module);
 
 	std::unordered_map<std::string, std::function<bool()>> const ACTION_NAME_TO_ACTION_MAP {
 		{ "Create scope", std::bind(&LLParser::CreateScopeAction, this) },
@@ -99,7 +102,9 @@ private:
 		{ "Create LLVM boolean literal", std::bind(&LLParser::CreateLlvmBooleanLiteral, this) },
 		{ "Create llvm integer value", std::bind(&LLParser::CreateLlvmIntegerValue, this) },
 		{ "Create llvm float value", std::bind(&LLParser::CreateLlvmFloatValue, this) },
-		{ "Try to set LLVM value from symbol table", std::bind(&LLParser::TryToSetLlvmValueFromSymbolTable, this) },
+		{ "Try to load LLVM value from symbol table", std::bind(&LLParser::TryToLoadLlvmValueFromSymbolTable, this) },
+		{ "Try to reference LLVM value from symbol table", std::bind(&LLParser::TryToReferenceLlvmValueFromSymbolTable, this) },
+		{ "Create LLVM read function", std::bind(&LLParser::CreateLllvmReadFunction, this) },
 		{ "Create LLVM write function", std::bind(&LLParser::CreateLllvmWriteFunction, this) },
 
 		{ "Synthesis Plus Integer", std::bind(&LLParser::SynthesisPlus, this) },
@@ -263,9 +268,16 @@ private:
 		{ "Synthesis Left curly bracket StatementList Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis Left curly bracket VariableDeclaration Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis Identifier IdentifierListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Identifier ReferencedIdentifierListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Identifier ValuedIdentifierListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Comma Identifier", std::bind(&LLParser::RemoveComma, this) },
-		{ "Synthesis Write function Left round bracket String literal WriteExtra Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionWriteExtra, this) },
+		{ "Synthesis Read function Left round bracket String literal ReadExtra Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionReadOrWriteExtra, this) },
+		{ "Synthesis Write function Left round bracket String literal WriteExtra Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionReadOrWriteExtra, this) },
 		{ "Synthesis Comma IdentifierList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
+		{ "Synthesis Comma ReferencedIdentifierList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
+		{ "Synthesis Comma ValuedIdentifierList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
+		{ "Synthesis Write function Left round bracket String literal Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionReadOrWriteExtra, this) },
+		{ "Synthesis Write function StatementList", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "", std::bind(&LLParser::abc, this) },
 	};
 
@@ -300,7 +312,8 @@ private:
 		"Synthesis Assignment Identifier ArithmeticNegate",
 		"Synthesis VariableDeclaration VariableDeclaration",
 		"Synthesis VariableDeclaration If",
-		"Synthesis VariableDeclaration Write function"
+		"Synthesis VariableDeclaration Write function",
+		"Synthesis Read function Write function"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {

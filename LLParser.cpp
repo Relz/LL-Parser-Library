@@ -992,13 +992,24 @@ bool LLParser::CreateLlvmFloatValue()
 	return true;
 }
 
-bool LLParser::TryToSetLlvmValueFromSymbolTable()
+bool LLParser::TryToLoadLlvmValueFromSymbolTable()
 {
 	AstNode * astNode = m_ast.back();
 	SymbolTableRow symbolTableRow;
 	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->stringValue), symbolTableRow);
 	astNode->computedType = symbolTableRow.type;
 	astNode->llvmValue = m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, symbolTableRow.name + "_value");
+
+	return true;
+}
+
+bool LLParser::TryToReferenceLlvmValueFromSymbolTable()
+{
+	AstNode * astNode = m_ast.back();
+	SymbolTableRow symbolTableRow;
+	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->stringValue), symbolTableRow);
+	astNode->computedType = symbolTableRow.type;
+	astNode->llvmValue = symbolTableRow.llvmAllocaInst;
 
 	return true;
 }
@@ -1011,28 +1022,41 @@ bool LLParser::RemoveComma()
 	return true;
 }
 
-bool LLParser::RemovePredefinedFunctionWriteExtra()
+bool LLParser::RemovePredefinedFunctionReadOrWriteExtra()
 {
-	AstNode * writeContainer = m_ast.back();
-	AstNode * writeFunction = writeContainer->children.front();
-	AstNode * formatString = writeContainer->children[2];
-	std::vector<AstNode*> const & writeParameters = writeContainer->children[3]->children;
-	writeFunction->children.emplace_back(formatString);
-	writeFunction->children.insert(writeFunction->children.end(), writeParameters.begin(), writeParameters.end());
-	m_ast.back() = writeFunction;
+	AstNode * container = m_ast.back();
+	AstNode * function = container->children.front();
+	AstNode * formatString = container->children[2];
+	std::vector<AstNode*> const & parameters = container->children[3]->children;
+	function->children.emplace_back(formatString);
+	function->children.insert(function->children.end(), parameters.begin(), parameters.end());
+	m_ast.back() = function;
+
+	return true;
+}
+
+bool LLParser::CreateLllvmReadFunction()
+{
+	std::vector<AstNode*> & functionParameters = m_ast.back()->children;
+	std::vector<llvm::Value *> arguments;
+	for (AstNode * functionParameter : functionParameters)
+	{
+		arguments.emplace_back(functionParameter->llvmValue);
+	}
+	m_builder->CreateCall(LLParser::ScanfPrototype(m_context, m_module.get()), arguments);
 
 	return true;
 }
 
 bool LLParser::CreateLllvmWriteFunction()
 {
-	std::vector<AstNode*> & writeFunctionParameters = m_ast.back()->children;
-	std::vector<llvm::Value *> printfArguments;
-	for (AstNode * writeFunctionParameter : writeFunctionParameters)
+	std::vector<AstNode*> & functionParameters = m_ast.back()->children;
+	std::vector<llvm::Value *> arguments;
+	for (AstNode * functionParameter : functionParameters)
 	{
-		printfArguments.emplace_back(writeFunctionParameter->llvmValue);
+		arguments.emplace_back(functionParameter->llvmValue);
 	}
-	m_builder->CreateCall(LLParser::PrintfPrototype(m_context, m_module.get()), printfArguments);
+	m_builder->CreateCall(LLParser::PrintfPrototype(m_context, m_module.get()), arguments);
 
 	return true;
 }
@@ -1199,6 +1223,16 @@ llvm::Function * LLParser::PrintfPrototype(llvm::LLVMContext & context, llvm::Mo
 	static std::vector<llvm::Type *> argumentsTypes { llvm::Type::getInt8PtrTy(context) };
 	static llvm::FunctionType * type = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), argumentsTypes, true);
 	static llvm::Function * result = llvm::Function::Create(type, llvm::Function::ExternalLinkage, "printf", module);
+	result->setCallingConv(llvm::CallingConv::C);
+
+	return result;
+}
+
+llvm::Function * LLParser::ScanfPrototype(llvm::LLVMContext & context, llvm::Module * module)
+{
+	static std::vector<llvm::Type *> argumentsTypes { llvm::Type::getInt8PtrTy(context) };
+	static llvm::FunctionType * type = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), argumentsTypes, true);
+	static llvm::Function * result = llvm::Function::Create(type, llvm::Function::ExternalLinkage, "scanf", module);
 	result->setCallingConv(llvm::CallingConv::C);
 
 	return result;
