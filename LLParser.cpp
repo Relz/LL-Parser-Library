@@ -1054,7 +1054,7 @@ bool LLParser::RemovePredefinedFunctionReadOrWriteExtra()
 	return true;
 }
 
-bool LLParser::CreateLllvmReadFunction()
+bool LLParser::CreateLlvmReadFunction()
 {
 	std::vector<AstNode*> & functionParameters = m_ast.back()->children;
 	std::vector<llvm::Value *> arguments;
@@ -1067,7 +1067,7 @@ bool LLParser::CreateLllvmReadFunction()
 	return true;
 }
 
-bool LLParser::CreateLllvmWriteFunction()
+bool LLParser::CreateLlvmWriteFunction()
 {
 	std::vector<AstNode*> & functionParameters = m_ast.back()->children;
 	std::vector<llvm::Value *> arguments;
@@ -1143,12 +1143,6 @@ bool LLParser::GotoPostIfStatementLabel()
 bool LLParser::StartBlockPrevious()
 {
 	m_builder->SetInsertPoint(m_previousBlocks.top());
-
-	return true;
-}
-
-bool LLParser::EndBlockPrevious()
-{
 	m_previousBlocks.pop();
 
 	return true;
@@ -1183,6 +1177,7 @@ bool LLParser::CreateWhileStatement()
 bool LLParser::StartBlockWhile()
 {
 	m_builder->SetInsertPoint(m_whileBlocks.top());
+	m_whileBlocks.pop();
 
 	return true;
 }
@@ -1221,6 +1216,13 @@ bool LLParser::SavePostIfStatementToPreviousBlocks()
 {
 	llvm::BasicBlock * blockPostIfStatement = llvm::BasicBlock::Create(m_context, "post if statement", m_mainFunction);
 	m_previousBlocks.push(blockPostIfStatement);
+
+	return true;
+}
+
+bool LLParser::EndBlockPreWhile()
+{
+	m_preWhileBlocks.pop();
 
 	return true;
 }

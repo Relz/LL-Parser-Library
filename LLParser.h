@@ -63,8 +63,8 @@ private:
 	bool RemoveBracketsAndSynthesis();
 	bool RemoveComma();
 	bool RemovePredefinedFunctionReadOrWriteExtra();
-	bool CreateLllvmReadFunction();
-	bool CreateLllvmWriteFunction();
+	bool CreateLlvmReadFunction();
+	bool CreateLlvmWriteFunction();
 	bool SynthesisLastChildrenChildren();
 	bool RemoveElseKeyword();
 	bool RemoveIfOrWhileStatementExtra();
@@ -73,7 +73,6 @@ private:
 	bool StartBlockTrue();
 	bool StartBlockFalse();
 	bool StartBlockPrevious();
-	bool EndBlockPrevious();
 	bool CreateWhileStatement();
 	bool SynthesisIfOrWhileCondition();
 	bool CreateBlockWhile();
@@ -83,6 +82,7 @@ private:
 	bool StartBlockPreWhile();
 	bool SynthesisIfOrWhileConditionAndRemoveEmptyElse();
 	bool SavePostIfStatementToPreviousBlocks();
+	bool EndBlockPreWhile();
 	bool abc();
 
 	bool CreateLlvmStringLiteral();
@@ -125,14 +125,13 @@ private:
 		{ "Create llvm float value", std::bind(&LLParser::CreateLlvmFloatValue, this) },
 		{ "Try to load LLVM value from symbol table", std::bind(&LLParser::TryToLoadLlvmValueFromSymbolTable, this) },
 		{ "Try to reference LLVM value from symbol table", std::bind(&LLParser::TryToReferenceLlvmValueFromSymbolTable, this) },
-		{ "Create LLVM read function", std::bind(&LLParser::CreateLllvmReadFunction, this) },
-		{ "Create LLVM write function", std::bind(&LLParser::CreateLllvmWriteFunction, this) },
+		{ "Create LLVM read function", std::bind(&LLParser::CreateLlvmReadFunction, this) },
+		{ "Create LLVM write function", std::bind(&LLParser::CreateLlvmWriteFunction, this) },
 		{ "Create if statement", std::bind(&LLParser::CreateIfStatement, this) },
 		{ "Start block true", std::bind(&LLParser::StartBlockTrue, this) },
 		{ "Goto post if statement label", std::bind(&LLParser::GotoPostIfStatementLabel, this) },
 		{ "Start block false", std::bind(&LLParser::StartBlockFalse, this) },
 		{ "Start block previous", std::bind(&LLParser::StartBlockPrevious, this) },
-		{ "End block previous", std::bind(&LLParser::EndBlockPrevious, this) },
 		{ "Create while statement", std::bind(&LLParser::CreateWhileStatement, this) },
 		{ "Create block while", std::bind(&LLParser::CreateBlockWhile, this) },
 		{ "Start block while", std::bind(&LLParser::StartBlockWhile, this) },
@@ -140,6 +139,7 @@ private:
 		{ "Goto block pre while", std::bind(&LLParser::GotoBlockPreWhile, this) },
 		{ "Start block pre while", std::bind(&LLParser::StartBlockPreWhile, this) },
 		{ "Save post if statement to previous blocks", std::bind(&LLParser::SavePostIfStatementToPreviousBlocks, this) },
+		{ "End block pre while", std::bind(&LLParser::EndBlockPreWhile, this) },
 
 		{ "Synthesis Plus Integer", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus Integer B", std::bind(&LLParser::SynthesisPlus, this) },
