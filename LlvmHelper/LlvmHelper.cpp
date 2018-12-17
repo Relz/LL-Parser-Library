@@ -93,6 +93,9 @@ llvm::Value * LlvmHelper::CreateAdd(llvm::IRBuilder<> * builder, std::string con
 	}
 	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
+		lhs = ConvertToFloat(builder, lhs);
+		rhs = ConvertToFloat(builder, rhs);
+
 		return builder->CreateFAdd(lhs, rhs, name);
 	}
 	throw std::runtime_error("LlvmHelper::CreateAdd: Unsupported type \"" + type + "\"");
@@ -106,6 +109,9 @@ llvm::Value * LlvmHelper::CreateSub(llvm::IRBuilder<> * builder, std::string con
 	}
 	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
+		lhs = ConvertToFloat(builder, lhs);
+		rhs = ConvertToFloat(builder, rhs);
+
 		return builder->CreateFSub(lhs, rhs, name);
 	}
 	throw std::runtime_error("LlvmHelper::CreateSub: Unsupported type \"" + type + "\"");
@@ -119,6 +125,9 @@ llvm::Value * LlvmHelper::CreateMul(llvm::IRBuilder<> * builder, std::string con
 	}
 	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
+		lhs = ConvertToFloat(builder, lhs);
+		rhs = ConvertToFloat(builder, rhs);
+
 		return builder->CreateFMul(lhs, rhs, name);
 	}
 	throw std::runtime_error("LlvmHelper::CreateMul: Unsupported type \"" + type + "\"");
@@ -128,7 +137,10 @@ llvm::Value * LlvmHelper::CreateSDiv(llvm::IRBuilder<> * builder, std::string co
 {
 	if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
-		return builder->CreateSDiv(lhs, rhs, name);
+		lhs = ConvertToFloat(builder, lhs);
+		rhs = ConvertToFloat(builder, rhs);
+
+		return builder->CreateFDiv(lhs, rhs, name);
 	}
 	throw std::runtime_error("LlvmHelper::CreateSDiv: Unsupported type \"" + type + "\"");
 }
@@ -137,6 +149,9 @@ llvm::Value * LlvmHelper::CreateExactSDiv(llvm::IRBuilder<> * builder, std::stri
 {
 	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
+		lhs = ConvertToInteger(builder, lhs);
+		rhs = ConvertToInteger(builder, rhs);
+
 		return builder->CreateExactSDiv(lhs, rhs, name);
 	}
 	throw std::runtime_error("LlvmHelper::CreateExactSDiv: Unsupported type \"" + type + "\"");
@@ -149,4 +164,14 @@ llvm::Value * LlvmHelper::CreateSRem(llvm::IRBuilder<> * builder, std::string co
 		return builder->CreateSRem(lhs, rhs, name);
 	}
 	throw std::runtime_error("LlvmHelper::CreateSRem: Unsupported type \"" + type + "\"");
+}
+
+llvm::Value * LlvmHelper::ConvertToFloat(llvm::IRBuilder<> * builder, llvm::Value * value)
+{
+	return builder->CreateSIToFP(value, llvm::Type::getDoubleTy(builder->getContext()), "conversion_to_float");
+}
+
+llvm::Value * LlvmHelper::ConvertToInteger(llvm::IRBuilder<> * builder, llvm::Value * value)
+{
+	return builder->CreateFPToSI(value, llvm::Type::getInt32Ty(builder->getContext()), "conversion_to_integer");
 }

@@ -21,6 +21,8 @@ public:
 	static llvm::Value * CreateSDiv(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name);
 	static llvm::Value * CreateExactSDiv(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name);
 	static llvm::Value * CreateSRem(llvm::IRBuilder<> * builder, std::string const & type, llvm::Value * lhs, llvm::Value * rhs, std::string const & name);
+	static llvm::Value * ConvertToFloat(llvm::IRBuilder<> * builder, llvm::Value * value);
+	static llvm::Value * ConvertToInteger(llvm::IRBuilder<> * builder, llvm::Value * value);
 private:
 	LlvmHelper() = default;
 };

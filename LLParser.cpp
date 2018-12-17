@@ -18,6 +18,7 @@
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/ExecutionEngine/Interpreter.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 LLParser::LLParser(std::string const & ruleFileName)
 	: m_llTableBuilder(ruleFileName)
@@ -29,6 +30,7 @@ LLParser::LLParser(std::string const & ruleFileName)
 	m_mainBlock = llvm::BasicBlock::Create(m_context, "main block", m_mainFunction, 0);
 	m_builder = new llvm::IRBuilder(m_context);
 	m_builder->SetInsertPoint(m_mainBlock);
+	m_previousBlocks.push(m_mainBlock);
 }
 
 bool LLParser::IsValid(
@@ -348,8 +350,23 @@ bool LLParser::AddVariableToScope()
 	computeDimensions(dimensions);
 	llvm::Type * llvmType = LlvmHelper::CreateType(m_context, variableType);
 	llvm::AllocaInst * llvmAllocaInst = m_builder->CreateAlloca(llvmType, 0, "(" + variableName + ")" + "_pointer");
+	if (variableType == TokenConstant::CoreType::Number::FLOAT && m_ast.back()->computedType == TokenConstant::CoreType::Number::INTEGER)
+	{
+		m_ast.back()->llvmValue = LlvmHelper::ConvertToFloat(m_builder, m_ast.back()->llvmValue);
+	}
 	m_builder->CreateStore(m_ast.back()->llvmValue, llvmAllocaInst);
 	m_scopes.back()[variableName] = m_symbolTable.CreateRow(variableType, variableName, llvmAllocaInst, dimensions);
+
+	return true;
+}
+
+bool LLParser::UpdateVariableInScope()
+{
+	std::string & variableName = m_ast[m_ast.size() - 3]->stringValue;
+
+	SymbolTableRow symbolTableRow;
+	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(variableName), symbolTableRow);
+	m_builder->CreateStore(m_ast.back()->llvmValue, symbolTableRow.llvmAllocaInst);
 
 	return true;
 }
@@ -616,7 +633,7 @@ bool LLParser::SynthesisIntegerDivision()
 			rhsType = rhsNode->computedType;
 		}
 	}
-	std::string & resultType = lhsType;
+	std::string resultType;
 	if (!AreTypesCompatible(lhsType, rhsType, resultType))
 	{
 		PrintErrorMessage(
@@ -628,6 +645,7 @@ bool LLParser::SynthesisIntegerDivision()
 
 	if (identifiersExists)
 	{
+		resultType = TokenConstant::CoreType::Number::INTEGER;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = "(" + lhs + " // " + rhs + ")";
 		lhsNode->isTemporaryIdentifier = true;
@@ -679,7 +697,7 @@ bool LLParser::SynthesisDivision()
 			rhsType = rhsNode->computedType;
 		}
 	}
-	std::string & resultType = lhsType;
+	std::string resultType;
 	if (!AreTypesCompatible(lhsType, rhsType, resultType))
 	{
 		PrintErrorMessage(
@@ -691,6 +709,7 @@ bool LLParser::SynthesisDivision()
 
 	if (identifiersExists)
 	{
+		resultType = TokenConstant::CoreType::Number::FLOAT;
 		lhsNode->type = TokenConstant::Name::IDENTIFIER;
 		lhsNode->stringValue = "(" + lhs + " / " + rhs + ")";
 		lhsNode->isTemporaryIdentifier = true;
@@ -1068,6 +1087,144 @@ bool LLParser::SynthesisLastChildrenChildren()
 	return true;
 }
 
+bool LLParser::RemoveElseKeyword()
+{
+	m_ast.back() = m_ast.back()->children.back();
+
+	return true;
+}
+
+bool LLParser::RemoveIfOrWhileStatementExtra()
+{
+	std::vector<AstNode*> & ifChildren = m_ast.back()->children;
+	ifChildren.erase(ifChildren.begin());
+	ifChildren.erase(ifChildren.begin());
+	ifChildren.erase(ifChildren.begin() + 1);
+
+	return true;
+}
+
+bool LLParser::CreateIfStatement()
+{
+	llvm::Value * condition = CreateCondition("if condition");
+	llvm::BasicBlock * blockTrue = llvm::BasicBlock::Create(m_context, "block true", m_mainFunction);
+	llvm::BasicBlock * blockFalse = llvm::BasicBlock::Create(m_context, "block false", m_mainFunction);
+	m_blocksTrue.push(blockTrue);
+	m_blocksFalse.push(blockFalse);
+
+	m_builder->CreateCondBr(condition, blockTrue, blockFalse);
+
+	return true;
+}
+
+bool LLParser::StartBlockTrue()
+{
+	m_builder->SetInsertPoint(m_blocksTrue.top());
+	m_blocksTrue.pop();
+
+	return true;
+}
+
+bool LLParser::StartBlockFalse()
+{
+	m_builder->SetInsertPoint(m_blocksFalse.top());
+	m_blocksFalse.pop();
+
+	return true;
+}
+
+bool LLParser::GotoPostIfStatementLabel()
+{
+	m_builder->CreateBr(m_previousBlocks.top());
+
+	return true;
+}
+
+bool LLParser::StartBlockPrevious()
+{
+	m_builder->SetInsertPoint(m_previousBlocks.top());
+
+	return true;
+}
+
+bool LLParser::EndBlockPrevious()
+{
+	m_previousBlocks.pop();
+
+	return true;
+}
+
+bool LLParser::SynthesisIfOrWhileCondition()
+{
+	m_ast.back()->children.front() = m_ast.back()->children.front()->children.front();
+
+	return true;
+}
+
+bool LLParser::CreateBlockWhile()
+{
+	llvm::BasicBlock * blockWhileStatement = llvm::BasicBlock::Create(m_context, "while", m_mainFunction);
+	m_whileBlocks.push(blockWhileStatement);
+
+	return true;
+}
+
+bool LLParser::CreateWhileStatement()
+{
+	llvm::Value * condition = CreateCondition("while condition");
+	llvm::BasicBlock * blockPostWhile = llvm::BasicBlock::Create(m_context, "post while", m_mainFunction);
+	m_previousBlocks.push(blockPostWhile);
+
+	m_builder->CreateCondBr(condition, m_whileBlocks.top(), blockPostWhile);
+
+	return true;
+}
+
+bool LLParser::StartBlockWhile()
+{
+	m_builder->SetInsertPoint(m_whileBlocks.top());
+
+	return true;
+}
+
+bool LLParser::CreateBlockPreWhile()
+{
+	llvm::BasicBlock * blockPreWhileStatement = llvm::BasicBlock::Create(m_context, "pre while", m_mainFunction);
+	m_preWhileBlocks.push(blockPreWhileStatement);
+
+	return true;
+}
+
+bool LLParser::GotoBlockPreWhile()
+{
+	m_builder->CreateBr(m_preWhileBlocks.top());
+
+	return true;
+}
+
+bool LLParser::StartBlockPreWhile()
+{
+	m_builder->SetInsertPoint(m_preWhileBlocks.top());
+
+	return true;
+}
+
+bool LLParser::SynthesisIfOrWhileConditionAndRemoveEmptyElse()
+{
+	SynthesisIfOrWhileCondition();
+	m_ast.back()->children.pop_back();
+
+	return true;
+}
+
+bool LLParser::SavePostIfStatementToPreviousBlocks()
+{
+	llvm::BasicBlock * blockPostIfStatement = llvm::BasicBlock::Create(m_context, "post if statement", m_mainFunction);
+	m_previousBlocks.push(blockPostIfStatement);
+
+	return true;
+}
+
 bool LLParser::abc()
 {
 	return true;
@@ -1216,6 +1373,26 @@ AstNode * LLParser::CreateLiteralAstNode(std::string const & type, std::string c
 	result->llvmValue = LlvmHelper::CreateConstant(m_context, type, value);
 
 	return result;
+}
+
+llvm::Value * LLParser::CreateCondition(std::string const & name)
+{
+	AstNode * expressionNode = m_ast[m_ast.size() - 2];
+
+	llvm::Value * expression = expressionNode->llvmValue;
+	if (expressionNode->computedType == TokenConstant::CoreType::Number::INTEGER)
+	{
+		expression = LlvmHelper::ConvertToFloat(m_builder, expression);
+	}
+	else if (expressionNode->computedType == TokenConstant::CoreType::BOOLEAN)
+	{
+		expression = LlvmHelper::ConvertToFloat(m_builder, expression);
+	}
+	else if (expressionNode->computedType != TokenConstant::CoreType::Number::FLOAT)
+	{
+		throw std::runtime_error("LLParser::CreateIfStatement: Unsupported type in expression \"" + expressionNode->computedType + "\"");
+	}
+	return m_builder->CreateFCmpONE(expression, LlvmHelper::CreateFloatConstant(m_context, 0.0), name);
 }
 
 llvm::Function * LLParser::PrintfPrototype(llvm::LLVMContext & context, llvm::Module * module)

@@ -42,6 +42,7 @@ private:
 	bool DestroyScopeAction();
 	void computeDimensions(std::vector<unsigned int> & dimensions);
 	bool AddVariableToScope();
+	bool UpdateVariableInScope();
 	bool CheckIdentifierForAlreadyExisting() const;
 	bool CheckIdentifierForExisting() const;
 	bool Synthesis();
@@ -65,6 +66,23 @@ private:
 	bool CreateLllvmReadFunction();
 	bool CreateLllvmWriteFunction();
 	bool SynthesisLastChildrenChildren();
+	bool RemoveElseKeyword();
+	bool RemoveIfOrWhileStatementExtra();
+	bool CreateIfStatement();
+	bool GotoPostIfStatementLabel();
+	bool StartBlockTrue();
+	bool StartBlockFalse();
+	bool StartBlockPrevious();
+	bool EndBlockPrevious();
+	bool CreateWhileStatement();
+	bool SynthesisIfOrWhileCondition();
+	bool CreateBlockWhile();
+	bool StartBlockWhile();
+	bool CreateBlockPreWhile();
+	bool GotoBlockPreWhile();
+	bool StartBlockPreWhile();
+	bool SynthesisIfOrWhileConditionAndRemoveEmptyElse();
+	bool SavePostIfStatementToPreviousBlocks();
 	bool abc();
 
 	bool CreateLlvmStringLiteral();
@@ -85,6 +103,8 @@ private:
 	bool AreTypesCompatible(std::string const & lhsType, std::string const & rhsType, std::string & resultType);
 	bool IsUnaryMinus(std::string const & lhs);
 	AstNode * CreateLiteralAstNode(std::string const & type, std::string const & value);
+	llvm::Value * CreateCondition(std::string const & name);
+
 	static llvm::Function * PrintfPrototype(llvm::LLVMContext & context, llvm::Module * module);
 	static llvm::Function * ScanfPrototype(llvm::LLVMContext & context, llvm::Module * module);
 
@@ -92,6 +112,7 @@ private:
 		{ "Create scope", std::bind(&LLParser::CreateScopeAction, this) },
 		{ "Destroy scope", std::bind(&LLParser::DestroyScopeAction, this) },
 		{ "Add variable to scope", std::bind(&LLParser::AddVariableToScope, this) },
+		{ "Update variable in scope", std::bind(&LLParser::UpdateVariableInScope, this) },
 		{ "Check identifier for already existing", std::bind(&LLParser::CheckIdentifierForAlreadyExisting, this) },
 		{ "Check identifier for existing", std::bind(&LLParser::CheckIdentifierForExisting, this) },
 		{ "Synthesis", std::bind(&LLParser::Synthesis, this) },
@@ -106,6 +127,19 @@ private:
 		{ "Try to reference LLVM value from symbol table", std::bind(&LLParser::TryToReferenceLlvmValueFromSymbolTable, this) },
 		{ "Create LLVM read function", std::bind(&LLParser::CreateLllvmReadFunction, this) },
 		{ "Create LLVM write function", std::bind(&LLParser::CreateLllvmWriteFunction, this) },
+		{ "Create if statement", std::bind(&LLParser::CreateIfStatement, this) },
+		{ "Start block true", std::bind(&LLParser::StartBlockTrue, this) },
+		{ "Goto post if statement label", std::bind(&LLParser::GotoPostIfStatementLabel, this) },
+		{ "Start block false", std::bind(&LLParser::StartBlockFalse, this) },
+		{ "Start block previous", std::bind(&LLParser::StartBlockPrevious, this) },
+		{ "End block previous", std::bind(&LLParser::EndBlockPrevious, this) },
+		{ "Create while statement", std::bind(&LLParser::CreateWhileStatement, this) },
+		{ "Create block while", std::bind(&LLParser::CreateBlockWhile, this) },
+		{ "Start block while", std::bind(&LLParser::StartBlockWhile, this) },
+		{ "Create block pre while", std::bind(&LLParser::CreateBlockPreWhile, this) },
+		{ "Goto block pre while", std::bind(&LLParser::GotoBlockPreWhile, this) },
+		{ "Start block pre while", std::bind(&LLParser::StartBlockPreWhile, this) },
+		{ "Save post if statement to previous blocks", std::bind(&LLParser::SavePostIfStatementToPreviousBlocks, this) },
 
 		{ "Synthesis Plus Integer", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus Integer B", std::bind(&LLParser::SynthesisPlus, this) },
@@ -278,6 +312,13 @@ private:
 		{ "Synthesis Comma ValuedIdentifierList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
 		{ "Synthesis Write function Left round bracket String literal Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionReadOrWriteExtra, this) },
 		{ "Synthesis Write function StatementList", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Left curly bracket Write function Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Else keyword StatementListBlock", std::bind(&LLParser::RemoveElseKeyword, this) },
+		{ "Synthesis If keyword Left round bracket Identifier Right round bracket", std::bind(&LLParser::RemoveIfOrWhileStatementExtra, this) },
+		{ "Synthesis IfCondition StatementListBlock StatementListBlock", std::bind(&LLParser::SynthesisIfOrWhileCondition, this) },
+		{ "Synthesis IfCondition StatementListBlock", std::bind(&LLParser::SynthesisIfOrWhileConditionAndRemoveEmptyElse, this) },
+		{ "Synthesis WhileCondition StatementListBlock", std::bind(&LLParser::SynthesisIfOrWhileCondition, this) },
+		{ "Synthesis While keyword Left round bracket Identifier Right round bracket", std::bind(&LLParser::RemoveIfOrWhileStatementExtra, this) },
 		{ "", std::bind(&LLParser::abc, this) },
 	};
 
@@ -290,6 +331,7 @@ private:
 		"Synthesis VariableDeclarationA Assignment Character",
 		"Synthesis VariableDeclarationA Assignment String literal",
 		"Synthesis VariableDeclarationA Assignment Character literal",
+		"Synthesis VariableDeclarationA Assignment Boolean literal",
 		"Synthesis VariableDeclarationA Assignment ArithmeticPlus",
 		"Synthesis VariableDeclarationA Assignment ArithmeticMinus",
 		"Synthesis VariableDeclarationA Assignment ArithmeticMultiply",
@@ -303,6 +345,7 @@ private:
 		"Synthesis Identifier Assignment Character",
 		"Synthesis Identifier Assignment String literal",
 		"Synthesis Identifier Assignment Character literal",
+		"Synthesis Identifier Assignment Boolean literal",
 		"Synthesis Identifier Assignment ArithmeticPlus",
 		"Synthesis Identifier Assignment ArithmeticMinus",
 		"Synthesis Identifier Assignment ArithmeticMultiply",
@@ -312,8 +355,11 @@ private:
 		"Synthesis Assignment Identifier ArithmeticNegate",
 		"Synthesis VariableDeclaration VariableDeclaration",
 		"Synthesis VariableDeclaration If",
+		"Synthesis VariableDeclaration While",
 		"Synthesis VariableDeclaration Write function",
-		"Synthesis Read function Write function"
+		"Synthesis Read function Write function",
+		"Synthesis Assignment If",
+		"Synthesis Write function Assignment"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
@@ -333,6 +379,11 @@ private:
 	llvm::Function * m_mainFunction;
 	llvm::BasicBlock * m_mainBlock;
 	llvm::IRBuilder<> * m_builder;
+	std::stack<llvm::BasicBlock*> m_preWhileBlocks;
+	std::stack<llvm::BasicBlock*> m_whileBlocks;
+	std::stack<llvm::BasicBlock*> m_blocksTrue;
+	std::stack<llvm::BasicBlock*> m_blocksFalse;
+	std::stack<llvm::BasicBlock*> m_previousBlocks;
 };
 
 #endif
