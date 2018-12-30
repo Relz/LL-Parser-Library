@@ -14,6 +14,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/ExecutionEngine/Interpreter.h>
@@ -24,6 +25,7 @@ LLParser::LLParser(std::string const & ruleFileName)
 	: m_llTableBuilder(ruleFileName)
 {
 	m_module = std::make_unique<llvm::Module>("Main", m_context);
+	m_dataLayout = std::make_unique<llvm::DataLayout>(m_module.get());
 	std::vector<llvm::Type *> mainFunctionArgumentsTypes;
 	m_mainFunctionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(m_context), mainFunctionArgumentsTypes, false);
 	m_mainFunction = llvm::Function::Create(m_mainFunctionType, llvm::GlobalValue::ExternalLinkage, "main", m_module.get());
@@ -178,7 +180,7 @@ bool LLParser::IsValid(
 		std::cout << "\033[1;30;42m" << "--------------------------------------" << "\033[0m" << std::endl;
 		std::cout << "         ⬇         ⬇         ⬇        " << std::endl;
 
-		m_builder->CreateRet(LlvmHelper::CreateIntegerConstant(m_context, 0));
+		m_builder->CreateRet(LlvmHelper::CreateInteger32Constant(m_context, 0));
 		std::cout << "\033[1;30;44m" << "------------ LLVM-IR Code ------------" << "\033[0m" << std::endl;
 		llvm::outs() << "\033[34m";
 		m_module->print(llvm::outs(), nullptr);
@@ -336,25 +338,50 @@ bool LLParser::DestroyScopeAction()
 	return true;
 }
 
-void LLParser::computeDimensions(std::vector<unsigned int> & dimensions)
+void LLParser::ComputeDimensions(AstNode * extendedType, std::vector<unsigned int> & dimensions)
 {
-
+	if (extendedType->children.empty())
+	{
+		return;
+	}
+	std::vector<AstNode*> const & dimensionsNodes = extendedType->children.back()->children;
+	for (AstNode * dimensionNode : dimensionsNodes)
+	{
+		dimensions.emplace_back(stoi(dimensionNode->stringValue));
+	}
 }
 
 bool LLParser::AddVariableToScope()
 {
 	std::vector<AstNode*> & extendedType = m_ast[m_ast.size() - 3]->children;
 	std::string & variableType = extendedType[0]->stringValue;
+	std::string arraySizeString;
+	if (variableType.empty())
+	{
+		variableType = extendedType.front()->children.front()->stringValue;
+		arraySizeString = extendedType.front()->children.back()->children.front()->stringValue;
+	}
 	std::string & variableName = extendedType[1]->stringValue;
 	std::vector<unsigned int> dimensions;
-	computeDimensions(dimensions);
-	llvm::Type * llvmType = LlvmHelper::CreateType(m_context, variableType);
-	llvm::AllocaInst * llvmAllocaInst = m_builder->CreateAlloca(llvmType, 0, "(" + variableName + ")" + "_pointer");
+	ComputeDimensions(extendedType.front(), dimensions);
+	llvm::Type * llvmType = LlvmHelper::CreateType(m_context, variableType, arraySizeString);
+	llvm::AllocaInst * llvmAllocaInst = nullptr;
 	if (variableType == TokenConstant::CoreType::Number::FLOAT && m_ast.back()->computedType == TokenConstant::CoreType::Number::INTEGER)
 	{
 		m_ast.back()->llvmValue = LlvmHelper::ConvertToFloat(m_builder, m_ast.back()->llvmValue);
 	}
-	m_builder->CreateStore(m_ast.back()->llvmValue, llvmAllocaInst);
+	if (arraySizeString.empty())
+	{
+		llvmAllocaInst = m_builder->CreateAlloca(llvmType, nullptr, "(" + variableName + ")" + "_pointer");
+		m_builder->CreateStore(m_ast.back()->llvmValue, llvmAllocaInst);
+	}
+	else
+	{
+		int arraySize = stoi(arraySizeString);
+		llvm::Value * arraySizeValue = LlvmHelper::CreateInteger32Constant(m_context, arraySize);
+		llvmAllocaInst = m_builder->CreateAlloca(llvmType, arraySizeValue, "(" + variableName + ")" + "_pointer");
+		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, arraySize);
+	}
 	m_scopes.back()[variableName] = m_symbolTable.CreateRow(variableType, variableName, llvmAllocaInst, dimensions);
 
 	return true;
@@ -388,7 +415,9 @@ bool LLParser::CheckIdentifierForAlreadyExisting() const
 
 bool LLParser::CheckIdentifierForExisting() const
 {
-	std::string const & identifierNameToCheck = m_ast.back()->stringValue;
+	std::string const & identifierNameToCheck = m_ast.back()->stringValue.empty() && !m_ast.back()->children.empty()
+			? m_ast.back()->children.front()->stringValue
+			: m_ast.back()->stringValue;
 	for (std::unordered_map<std::string, unsigned int> const & scope : m_scopes)
 	{
 		if (scope.find(identifierNameToCheck) != scope.end())
@@ -801,8 +830,15 @@ bool LLParser::SynthesisModulus()
 
 bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 {
-	std::string variableType = m_ast[m_ast.size() - 3]->children.front()->stringValue;
-	std::string & variableName = m_ast[m_ast.size() - 3]->children[1]->stringValue;
+	std::vector<AstNode*> & variableDeclarationChildren = m_ast[m_ast.size() - 3]->children;
+	std::string variableType = variableDeclarationChildren.front()->stringValue;
+	std::string arraySizeString;
+	if (variableType.empty())
+	{
+		variableType = TokenConstant::CoreType::Complex::ARRAY;
+		arraySizeString = variableDeclarationChildren.front()->children.back()->children.front()->stringValue;
+	}
+	std::string & variableName = variableDeclarationChildren[1]->stringValue;
 	std::string rightHandType = m_ast.back()->type;
 	std::string & rightHandValue = m_ast.back()->stringValue;
 	if (rightHandType == TokenConstant::Name::IDENTIFIER)
@@ -816,6 +852,18 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 		else
 		{
 			rightHandType = m_ast.back()->computedType;
+		}
+	}
+	else if (rightHandType == TokenConstant::Name::ARRAY_LITERAL)
+	{
+		AstNode * arrayLiteral = m_ast.back();
+		if (arrayLiteral->children.size() != stoi(arraySizeString))
+		{
+			PrintErrorMessage(
+				"Cannot set array literal with size " + std::to_string(arrayLiteral->children.size())
+				+ " to array variable " + "\"" + variableName + "\"" + " with size " + std::string(arraySizeString) + "\n");
+
+			return false;
 		}
 	}
 	bool areTypesCompatible = true;
@@ -902,8 +950,9 @@ bool LLParser::SynthesisType()
 
 bool LLParser::RemoveBrackets()
 {
-	m_ast.back()->children.erase(m_ast.back()->children.begin());
-	m_ast.back()->children.pop_back();
+	std::vector<AstNode *> & lastChildChildren = m_ast.back()->children;
+	lastChildChildren.erase(lastChildChildren.begin());
+	lastChildChildren.pop_back();
 
 	return true;
 }
@@ -995,10 +1044,53 @@ bool LLParser::CreateLlvmBooleanLiteral()
 	return true;
 }
 
+void LLParser::ComputeArrayLiteralValues(std::vector<AstNode*> const & astNodes, std::vector<llvm::Constant*> & arrayLiteralValues)
+{
+	for (AstNode * astNode : astNodes)
+	{
+		arrayLiteralValues.emplace_back((llvm::Constant*)astNode->llvmValue);
+	}
+}
+
+void LLParser::ComputeArrayLiteralName(AstNode * arrayLiteralNode, std::string & arrayLiteralName)
+{
+	std::string arrayLiteralString = "[";
+	for (size_t i = 0; i < arrayLiteralNode->children.size(); ++i)
+	{
+		AstNode * arrayLiteralValue = arrayLiteralNode->children[i];
+		arrayLiteralString += arrayLiteralValue->stringValue;
+		if (i < arrayLiteralNode->children.size() - 1)
+		{
+			arrayLiteralString += ", ";
+		}
+	}
+	arrayLiteralString += "]";
+	arrayLiteralName = arrayLiteralNode->type + ": " + arrayLiteralString;
+}
+
+bool LLParser::CreateLlvmArrayLiteral()
+{
+	std::string const & arrayLiteralElementTypeString = m_ast[m_ast.size() - 3]->children.front()->children.front()->stringValue;
+	std::vector<llvm::Constant*> arrayLiteralValues;
+	ComputeArrayLiteralValues(m_ast.back()->children, arrayLiteralValues);
+	llvm::ArrayType * arrayType = (llvm::ArrayType*)LlvmHelper::CreateType(m_context, arrayLiteralElementTypeString, std::to_string(arrayLiteralValues.size()));
+
+	llvm::Constant * constant = llvm::ConstantArray::get(arrayType, arrayLiteralValues);
+	std::string arrayLiteralName;
+	ComputeArrayLiteralName(m_ast.back(), arrayLiteralName);
+	auto * globalVariable = new llvm::GlobalVariable(
+			*m_mainBlock->getParent()->getParent(), constant->getType(), true, llvm::GlobalValue::PrivateLinkage, constant, arrayLiteralName
+	);
+	globalVariable->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+	m_ast.back()->llvmValue = globalVariable;
+
+	return true;
+}
+
 bool LLParser::CreateLlvmIntegerValue()
 {
 	AstNode * astNode = m_ast.back();
-	astNode->llvmValue = LlvmHelper::CreateIntegerConstant(m_context, std::stoi(astNode->stringValue));
+	astNode->llvmValue = LlvmHelper::CreateInteger32Constant(m_context, std::stoi(astNode->stringValue));
 
 	return true;
 }
@@ -1015,9 +1107,22 @@ bool LLParser::TryToLoadLlvmValueFromSymbolTable()
 {
 	AstNode * astNode = m_ast.back();
 	SymbolTableRow symbolTableRow;
-	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->stringValue), symbolTableRow);
-	astNode->computedType = symbolTableRow.type;
-	astNode->llvmValue = m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, symbolTableRow.name + "_value");
+	if (astNode->stringValue.empty())
+	{
+		m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->children.front()->stringValue), symbolTableRow);
+		std::string variableName = symbolTableRow.name + "[" + m_ast.back()->children.back()->stringValue + "]";
+		llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type, std::to_string(symbolTableRow.arrayInformation->dimensions.front()));
+		llvm::Type * arrayElementType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
+		llvm::Value * index64Bit = m_builder->CreateSExtOrTrunc(m_ast.back()->children.back()->llvmValue, llvm::Type::getInt64Ty(m_context));
+		llvm::Value * inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, symbolTableRow.llvmAllocaInst, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "(" + variableName + ")_pointer");
+		astNode->llvmValue = m_builder->CreateLoad(arrayElementType, inBoundsGetElementPointer, "(" + variableName + ")_value");
+	}
+	else
+	{
+		m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->stringValue), symbolTableRow);
+		astNode->computedType = symbolTableRow.type;
+		astNode->llvmValue = m_builder->CreateLoad(symbolTableRow.llvmAllocaInst, symbolTableRow.name + "_value");
+	}
 
 	return true;
 }
@@ -1080,6 +1185,21 @@ bool LLParser::CreateLlvmWriteFunction()
 	return true;
 }
 
+bool LLParser::CreateLlvmArrayAssignFunction(llvm::Value * allocaInst, std::string const & variableName, int arraySize)
+{
+	llvm::Value * bitcasted = m_builder->CreateBitCast(allocaInst, llvm::Type::getInt8PtrTy(m_context), "(" + variableName + ")" + "_pointer_bitcasted");
+	std::vector<llvm::Value*> arguments {
+		bitcasted,
+		m_builder->CreateBitCast(m_ast.back()->llvmValue, llvm::Type::getInt8PtrTy(m_context)),
+		LlvmHelper::CreateInteger64Constant(m_context, m_dataLayout->getTypeAllocSize(allocaInst->getType()) * arraySize),
+		LlvmHelper::CreateBooleanConstant(m_context, false)
+	};
+
+	m_builder->CreateCall(LLParser::MemcpyPrototype(m_context, m_module.get()), arguments);
+
+	return true;
+}
+
 bool LLParser::SynthesisLastChildrenChildren()
 {
 	m_ast.back()->children = m_ast.back()->children.back()->children;
@@ -1087,7 +1207,7 @@ bool LLParser::SynthesisLastChildrenChildren()
 	return true;
 }
 
-bool LLParser::RemoveElseKeyword()
+bool LLParser::SynthesisLastChildren()
 {
 	m_ast.back() = m_ast.back()->children.back();
 
@@ -1223,6 +1343,29 @@ bool LLParser::SavePostIfStatementToPreviousBlocks()
 bool LLParser::EndBlockPreWhile()
 {
 	m_preWhileBlocks.pop();
+
+	return true;
+}
+
+bool LLParser::ExpandArrayLiteral()
+{
+	if (m_ast.back()->children[1]->children.empty())
+	{
+		m_ast.back()->children.erase(m_ast.back()->children.begin());
+		m_ast.back()->children.pop_back();
+	}
+	else
+	{
+		m_ast.back()->children = m_ast.back()->children[1]->children;
+	}
+	m_ast.back()->type = TokenConstant::Name::ARRAY_LITERAL;
+
+	return true;
+}
+
+bool LLParser::SynthesisIdentifierPossibleArrayAccessing()
+{
+	m_ast.back()->children.back() = m_ast.back()->children.back()->children.front();
 
 	return true;
 }
@@ -1412,6 +1555,21 @@ llvm::Function * LLParser::ScanfPrototype(llvm::LLVMContext & context, llvm::Mod
 	static std::vector<llvm::Type *> argumentsTypes { llvm::Type::getInt8PtrTy(context) };
 	static llvm::FunctionType * type = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), argumentsTypes, true);
 	static llvm::Function * result = llvm::Function::Create(type, llvm::Function::ExternalLinkage, "scanf", module);
+	result->setCallingConv(llvm::CallingConv::C);
+
+	return result;
+}
+
+llvm::Function * LLParser::MemcpyPrototype(llvm::LLVMContext & context, llvm::Module * module)
+{
+	static std::vector<llvm::Type *> argumentsTypes {
+		llvm::Type::getInt8PtrTy(context),
+		llvm::Type::getInt8PtrTy(context),
+		llvm::Type::getInt64Ty(context),
+		llvm::Type::getInt1Ty(context)
+	};
+	static llvm::FunctionType * type = llvm::FunctionType::get(llvm::Type::getVoidTy(context), argumentsTypes, false);
+	static llvm::Function * result = llvm::Function::Create(type, llvm::Function::ExternalLinkage, "memcpy", module);
 	result->setCallingConv(llvm::CallingConv::C);
 
 	return result;

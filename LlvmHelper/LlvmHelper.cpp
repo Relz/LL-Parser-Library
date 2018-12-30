@@ -2,40 +2,49 @@
 #include "LlvmHelper.h"
 #include "../LexerLibrary/TokenLibrary/TokenConstant/TokenConstant.h"
 
-llvm::Type * LlvmHelper::CreateType(llvm::LLVMContext & context, std::string const & type)
+llvm::Type * LlvmHelper::CreateType(llvm::LLVMContext & context, std::string const & type, std::string const & arraySizeString)
 {
+	llvm::Type * elementType;
 	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
-		return llvm::Type::getInt32Ty(context);
+		elementType = llvm::Type::getInt32Ty(context);
 	}
 	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
-		return llvm::Type::getDoubleTy(context);
+		elementType = llvm::Type::getDoubleTy(context);
 	}
 	else if (type == TokenConstant::CoreType::CHARACTER)
 	{
-		return llvm::Type::getInt8Ty(context);
+		elementType = llvm::Type::getInt8Ty(context);
 	}
 	else if (type == TokenConstant::CoreType::BOOLEAN)
 	{
-		return llvm::Type::getInt8Ty(context);
+		elementType = llvm::Type::getInt8Ty(context);
 	}
 	else if (type == TokenConstant::CoreType::VOID)
 	{
-		return llvm::Type::getVoidTy(context);
+		elementType = llvm::Type::getVoidTy(context);
 	}
 	else if (type == TokenConstant::CoreType::Complex::STRING)
 	{
-		return llvm::ArrayType::getInt8PtrTy(context);
+		elementType = llvm::ArrayType::getInt8PtrTy(context);
 	}
-	throw std::runtime_error("LlvmHelper::CreateType: Unsupported type \"" + type + "\"");
+	else
+	{
+		throw std::runtime_error("LlvmHelper::CreateType: Unsupported type \"" + type + "\"");
+	}
+	if (arraySizeString.empty())
+	{
+		return elementType;
+	}
+	return llvm::ArrayType::get(elementType, stoi(arraySizeString));
 }
 
 llvm::Constant * LlvmHelper::CreateConstant(llvm::LLVMContext & context, std::string const & type, std::string const & value)
 {
 	if (type == TokenConstant::CoreType::Number::INTEGER)
 	{
-		return LlvmHelper::CreateIntegerConstant(context, std::stoi(value));
+		return LlvmHelper::CreateInteger32Constant(context, std::stoi(value));
 	}
 	else if (type == TokenConstant::CoreType::Number::FLOAT)
 	{
@@ -70,14 +79,30 @@ llvm::Constant * LlvmHelper::CreateBooleanConstant(llvm::LLVMContext & context, 
 	throw std::runtime_error("LlvmHelper::CreateConstant: \"" + value + "\"" + " is not boolean literal, possible values: \"True\", \"False\"");
 }
 
+llvm::Constant * LlvmHelper::CreateArrayConstant(llvm::LLVMContext & context, llvm::Type * arrayLiteralElementType, std::vector<llvm::Value *> const & arrayLiteralValues)
+{
+	std::vector<llvm::Constant*> values;
+	for (llvm::Value * arrayLiteralValue : arrayLiteralValues)
+	{
+		values.emplace_back((llvm::Constant*)arrayLiteralValue);
+	}
+
+	return llvm::ConstantArray::get((llvm::ArrayType*)arrayLiteralElementType, values);
+}
+
 llvm::Constant * LlvmHelper::CreateCharacterConstant(llvm::LLVMContext & context, char value)
 {
 	return llvm::ConstantInt::get(llvm::Type::getInt8Ty(context), value, false);
 }
 
-llvm::Constant * LlvmHelper::CreateIntegerConstant(llvm::LLVMContext & context, int value)
+llvm::Constant * LlvmHelper::CreateInteger32Constant(llvm::LLVMContext & context, int value)
 {
 	return llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), value, true);
+}
+
+llvm::Constant * LlvmHelper::CreateInteger64Constant(llvm::LLVMContext & context, int value)
+{
+	return llvm::ConstantInt::get(llvm::Type::getInt64Ty(context), value, true);
 }
 
 llvm::Constant * LlvmHelper::CreateFloatConstant(llvm::LLVMContext & context, double value)

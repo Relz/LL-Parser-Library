@@ -40,7 +40,7 @@ private:
 
 	bool CreateScopeAction();
 	bool DestroyScopeAction();
-	void computeDimensions(std::vector<unsigned int> & dimensions);
+	void ComputeDimensions(AstNode * extendedType, std::vector<unsigned int> & dimensions);
 	bool AddVariableToScope();
 	bool UpdateVariableInScope();
 	bool CheckIdentifierForAlreadyExisting() const;
@@ -65,8 +65,9 @@ private:
 	bool RemovePredefinedFunctionReadOrWriteExtra();
 	bool CreateLlvmReadFunction();
 	bool CreateLlvmWriteFunction();
+	bool CreateLlvmArrayAssignFunction(llvm::Value * allocaInst, std::string const & variableName, int arraySize);
 	bool SynthesisLastChildrenChildren();
-	bool RemoveElseKeyword();
+	bool SynthesisLastChildren();
 	bool RemoveIfOrWhileStatementExtra();
 	bool CreateIfStatement();
 	bool GotoPostIfStatementLabel();
@@ -83,11 +84,16 @@ private:
 	bool SynthesisIfOrWhileConditionAndRemoveEmptyElse();
 	bool SavePostIfStatementToPreviousBlocks();
 	bool EndBlockPreWhile();
+	bool ExpandArrayLiteral();
+	bool SynthesisIdentifierPossibleArrayAccessing();
 	bool abc();
 
 	bool CreateLlvmStringLiteral();
 	bool CreateLlvmCharacterLiteral();
 	bool CreateLlvmBooleanLiteral();
+	void ComputeArrayLiteralValues(std::vector<AstNode*> const & astNodes, std::vector<llvm::Constant*> & arrayLiteralValues);
+	void ComputeArrayLiteralName(AstNode * arrayLiteralNode, std::string & arrayLiteralName);
+	bool CreateLlvmArrayLiteral();
 	bool CreateLlvmIntegerValue();
 	bool CreateLlvmFloatValue();
 	bool TryToLoadLlvmValueFromSymbolTable();
@@ -107,6 +113,7 @@ private:
 
 	static llvm::Function * PrintfPrototype(llvm::LLVMContext & context, llvm::Module * module);
 	static llvm::Function * ScanfPrototype(llvm::LLVMContext & context, llvm::Module * module);
+	static llvm::Function * MemcpyPrototype(llvm::LLVMContext & context, llvm::Module * module);
 
 	std::unordered_map<std::string, std::function<bool()>> const ACTION_NAME_TO_ACTION_MAP {
 		{ "Create scope", std::bind(&LLParser::CreateScopeAction, this) },
@@ -121,6 +128,7 @@ private:
 		{ "Create LLVM string literal", std::bind(&LLParser::CreateLlvmStringLiteral, this) },
 		{ "Create LLVM character literal", std::bind(&LLParser::CreateLlvmCharacterLiteral, this) },
 		{ "Create LLVM boolean literal", std::bind(&LLParser::CreateLlvmBooleanLiteral, this) },
+		{ "Create LLVM array literal", std::bind(&LLParser::CreateLlvmArrayLiteral, this) },
 		{ "Create llvm integer value", std::bind(&LLParser::CreateLlvmIntegerValue, this) },
 		{ "Create llvm float value", std::bind(&LLParser::CreateLlvmFloatValue, this) },
 		{ "Try to load LLVM value from symbol table", std::bind(&LLParser::TryToLoadLlvmValueFromSymbolTable, this) },
@@ -305,6 +313,7 @@ private:
 		{ "Synthesis Identifier ReferencedIdentifierListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Identifier ValuedIdentifierListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Comma Identifier", std::bind(&LLParser::RemoveComma, this) },
+		{ "Synthesis Comma ExtendedIdentifier", std::bind(&LLParser::RemoveComma, this) },
 		{ "Synthesis Read function Left round bracket String literal ReadExtra Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionReadOrWriteExtra, this) },
 		{ "Synthesis Write function Left round bracket String literal WriteExtra Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionReadOrWriteExtra, this) },
 		{ "Synthesis Comma IdentifierList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
@@ -313,17 +322,36 @@ private:
 		{ "Synthesis Write function Left round bracket String literal Right round bracket Semicolon", std::bind(&LLParser::RemovePredefinedFunctionReadOrWriteExtra, this) },
 		{ "Synthesis Write function StatementList", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Left curly bracket Write function Right curly bracket", std::bind(&LLParser::RemoveBrackets, this) },
-		{ "Synthesis Else keyword StatementListBlock", std::bind(&LLParser::RemoveElseKeyword, this) },
+		{ "Synthesis Else keyword StatementListBlock", std::bind(&LLParser::SynthesisLastChildren, this) },
 		{ "Synthesis If keyword Left round bracket Identifier Right round bracket", std::bind(&LLParser::RemoveIfOrWhileStatementExtra, this) },
 		{ "Synthesis IfCondition StatementListBlock StatementListBlock", std::bind(&LLParser::SynthesisIfOrWhileCondition, this) },
-		{ "Synthesis IfCondition StatementListBlock", std::bind(&LLParser::SynthesisIfOrWhileConditionAndRemoveEmptyElse, this) },
+		{ "Synthesis IfConditioSynthesis Left square bracket String literal Right square bracketn StatementListBlock", std::bind(&LLParser::SynthesisIfOrWhileConditionAndRemoveEmptyElse, this) },
 		{ "Synthesis WhileCondition StatementListBlock", std::bind(&LLParser::SynthesisIfOrWhileCondition, this) },
 		{ "Synthesis While keyword Left round bracket Identifier Right round bracket", std::bind(&LLParser::RemoveIfOrWhileStatementExtra, this) },
+		{ "Synthesis Left square bracket Integer Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
+		{ "Synthesis Comma Integer", std::bind(&LLParser::RemoveComma, this) },
+		{ "Synthesis Comma Float", std::bind(&LLParser::RemoveComma, this) },
+		{ "Synthesis Comma Boolean literal", std::bind(&LLParser::RemoveComma, this) },
+		{ "Synthesis Comma String literal", std::bind(&LLParser::RemoveComma, this) },
+		{ "Synthesis Integer PossibleLiteralListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Float PossibleLiteralListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Boolean literal PossibleLiteralListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis String literal PossibleLiteralListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Comma PossibleLiteralList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
+		{ "Synthesis Integer PossibleLiteralList", std::bind(&LLParser::SynthesisLastChildren, this) },
+		{ "Synthesis Left square bracket PossibleLiteralList Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
+		{ "Synthesis Left square bracket String literal Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
+		{ "Synthesis Left square bracket Boolean literal Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
+		{ "Synthesis Left square bracket Float Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
+		{ "Synthesis Left square bracket Identifier Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
+		{ "Synthesis Identifier PossibleArrayAccessing", std::bind(&LLParser::SynthesisIdentifierPossibleArrayAccessing, this) },
 		{ "", std::bind(&LLParser::abc, this) },
 	};
 
 	std::unordered_set<std::string> IGNORED_ACTION_NAMES {
 		"Synthesis Type Identifier",
+		"Synthesis Type Integer",
+		"Synthesis ExtendedType Identifier",
 		"Synthesis VariableDeclarationA Assignment Integer",
 		"Synthesis VariableDeclarationA Assignment Float",
 		"Synthesis VariableDeclarationA Assignment Identifier",
@@ -332,6 +360,7 @@ private:
 		"Synthesis VariableDeclarationA Assignment String literal",
 		"Synthesis VariableDeclarationA Assignment Character literal",
 		"Synthesis VariableDeclarationA Assignment Boolean literal",
+		"Synthesis VariableDeclarationA Assignment ArrayLiteral",
 		"Synthesis VariableDeclarationA Assignment ArithmeticPlus",
 		"Synthesis VariableDeclarationA Assignment ArithmeticMinus",
 		"Synthesis VariableDeclarationA Assignment ArithmeticMultiply",
@@ -359,14 +388,16 @@ private:
 		"Synthesis VariableDeclaration Write function",
 		"Synthesis Read function Write function",
 		"Synthesis Assignment If",
-		"Synthesis Write function Assignment"
+		"Synthesis Write function Assignment",
+		"Synthesis Type PossibleArray"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
 		{ TokenConstant::CoreType::Complex::STRING, { TokenConstant::Name::STRING_LITERAL }},
 		{ TokenConstant::CoreType::CHARACTER, { TokenConstant::Name::CHARACTER_LITERAL }},
 		{ TokenConstant::CoreType::BOOLEAN, { TokenConstant::Name::BOOLEAN_LITERAL }},
-		{ TokenConstant::CoreType::Number::FLOAT, { TokenConstant::CoreType::Number::INTEGER }}
+		{ TokenConstant::CoreType::Number::FLOAT, { TokenConstant::CoreType::Number::INTEGER }},
+		{ TokenConstant::CoreType::Complex::ARRAY, { TokenConstant::Name::ARRAY_LITERAL }}
 	};
 
 	LLTableBuilder m_llTableBuilder;
@@ -379,6 +410,7 @@ private:
 	llvm::Function * m_mainFunction;
 	llvm::BasicBlock * m_mainBlock;
 	llvm::IRBuilder<> * m_builder;
+	std::unique_ptr<llvm::DataLayout> m_dataLayout;
 	std::stack<llvm::BasicBlock*> m_preWhileBlocks;
 	std::stack<llvm::BasicBlock*> m_whileBlocks;
 	std::stack<llvm::BasicBlock*> m_blocksTrue;
