@@ -393,7 +393,15 @@ bool LLParser::UpdateVariableInScope()
 
 	SymbolTableRow symbolTableRow;
 	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(variableName), symbolTableRow);
-	m_builder->CreateStore(m_ast.back()->llvmValue, symbolTableRow.llvmAllocaInst);
+	if (symbolTableRow.arrayInformation == nullptr)
+	{
+		m_builder->CreateStore(m_ast.back()->llvmValue, symbolTableRow.llvmAllocaInst);
+	}
+	else
+	{
+		int arraySize = symbolTableRow.arrayInformation->dimensions.front();
+		CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arraySize);
+	}
 
 	return true;
 }
@@ -898,6 +906,12 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const
 	SymbolTableRow symbolTableRow;
 	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(variableName), symbolTableRow);
 	std::string & variableType = symbolTableRow.type;
+	unsigned int arraySize = 0;
+	if (symbolTableRow.arrayInformation != nullptr)
+	{
+		arraySize = symbolTableRow.arrayInformation->dimensions.front();
+		variableType = TokenConstant::CoreType::Complex::ARRAY;
+	}
 	std::string rightHandType = m_ast.back()->type;
 	std::string & rightHandValue = m_ast.back()->stringValue;
 	if (rightHandType == TokenConstant::Name::IDENTIFIER)
@@ -1070,7 +1084,17 @@ void LLParser::ComputeArrayLiteralName(AstNode * arrayLiteralNode, std::string &
 
 bool LLParser::CreateLlvmArrayLiteral()
 {
-	std::string const & arrayLiteralElementTypeString = m_ast[m_ast.size() - 3]->children.front()->children.front()->stringValue;
+	std::string arrayLiteralElementTypeString;
+	if (m_ast[m_ast.size() - 3]->children.empty())
+	{
+		SymbolTableRow symbolTableRow;
+		m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(m_ast[m_ast.size() - 3]->stringValue), symbolTableRow);
+		arrayLiteralElementTypeString = symbolTableRow.type;
+	}
+	else
+	{
+		arrayLiteralElementTypeString = m_ast[m_ast.size() - 3]->children.front()->children.front()->stringValue;
+	}
 	std::vector<llvm::Constant*> arrayLiteralValues;
 	ComputeArrayLiteralValues(m_ast.back()->children, arrayLiteralValues);
 	llvm::ArrayType * arrayType = (llvm::ArrayType*)LlvmHelper::CreateType(m_context, arrayLiteralElementTypeString, std::to_string(arrayLiteralValues.size()));
@@ -1078,9 +1102,7 @@ bool LLParser::CreateLlvmArrayLiteral()
 	llvm::Constant * constant = llvm::ConstantArray::get(arrayType, arrayLiteralValues);
 	std::string arrayLiteralName;
 	ComputeArrayLiteralName(m_ast.back(), arrayLiteralName);
-	auto * globalVariable = new llvm::GlobalVariable(
-			*m_mainBlock->getParent()->getParent(), constant->getType(), true, llvm::GlobalValue::PrivateLinkage, constant, arrayLiteralName
-	);
+	auto * globalVariable = new llvm::GlobalVariable(*m_mainBlock->getParent()->getParent(), constant->getType(), true, llvm::GlobalValue::PrivateLinkage, constant, arrayLiteralName);
 	globalVariable->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 	m_ast.back()->llvmValue = globalVariable;
 
