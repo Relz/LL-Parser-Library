@@ -10,6 +10,7 @@
 #include <functional>
 #include <regex>
 #include <unordered_set>
+#include <numeric>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Constants.h>
@@ -378,6 +379,7 @@ bool LLParser::AddVariableToScope()
 	std::string & variableName = extendedType[1]->stringValue;
 	std::vector<unsigned int> dimensions;
 	ComputeDimensions(extendedType.front(), dimensions);
+	llvm::Type * arrayElementType = LlvmHelper::CreateType(m_context, variableType);
 	llvm::Type * llvmType = LlvmHelper::CreateType(m_context, variableType);
 	llvm::AllocaInst * llvmAllocaInst = nullptr;
 	if (variableType == TokenConstant::CoreType::Number::FLOAT && m_ast.back()->computedType == TokenConstant::CoreType::Number::INTEGER)
@@ -396,7 +398,7 @@ bool LLParser::AddVariableToScope()
 			llvmType = llvm::ArrayType::get(llvmType, dimensions[j]);
 		}
 		llvmAllocaInst = m_builder->CreateAlloca(llvmType, nullptr, "(" + variableName + ")" + "_pointer");
-		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, dimensions[dimensions.size() - 1]);
+		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, arrayElementType, std::accumulate(dimensions.begin(), dimensions.end(), 0));
 	}
 	m_scopes.back()[variableName] = m_symbolTable.CreateRow(variableType, variableName, llvmAllocaInst, dimensions);
 
@@ -434,8 +436,8 @@ bool LLParser::UpdateVariableInScope()
 		}
 		else
 		{
-			int arraySize = symbolTableRow.arrayInformation->dimensions.front();
-			CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arraySize);
+			llvm::Type * arrayElementType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
+			CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arrayElementType, std::accumulate(symbolTableRow.arrayInformation->dimensions.begin(), symbolTableRow.arrayInformation->dimensions.end(), 0));
 		}
 	}
 
@@ -1329,13 +1331,13 @@ bool LLParser::CreateLlvmWriteFunction()
 	return true;
 }
 
-bool LLParser::CreateLlvmArrayAssignFunction(llvm::Value * allocaInst, std::string const & variableName, int arraySize)
+bool LLParser::CreateLlvmArrayAssignFunction(llvm::Value * allocaInst, std::string const & variableName, llvm::Type * variableType, int arraySize)
 {
 	llvm::Value * bitcasted = m_builder->CreateBitCast(allocaInst, llvm::Type::getInt8PtrTy(m_context), "(" + variableName + ")" + "_pointer_bitcasted");
 	std::vector<llvm::Value*> arguments {
 		bitcasted,
 		m_builder->CreateBitCast(m_ast.back()->llvmValue, llvm::Type::getInt8PtrTy(m_context)),
-		LlvmHelper::CreateInteger64Constant(m_context, m_dataLayout->getTypeAllocSize(allocaInst->getType()) * arraySize),
+		LlvmHelper::CreateInteger64Constant(m_context, m_dataLayout->getTypeAllocSize(variableType) * arraySize),
 		LlvmHelper::CreateBooleanConstant(m_context, false)
 	};
 

@@ -67,7 +67,7 @@ private:
 	bool RemovePredefinedFunctionReadOrWriteExtra();
 	bool CreateLlvmReadFunction();
 	bool CreateLlvmWriteFunction();
-	bool CreateLlvmArrayAssignFunction(llvm::Value * allocaInst, std::string const & variableName, int arraySize);
+	bool CreateLlvmArrayAssignFunction(llvm::Value * allocaInst, std::string const & variableName, llvm::Type * variableType, int arraySize);
 	bool SynthesisLastChildrenChildren();
 	bool SynthesisLastChildren();
 	bool RemoveIfOrWhileStatementExtra();
@@ -347,13 +347,15 @@ private:
 		{ "Synthesis Left square bracket Float Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
 		{ "Synthesis Left square bracket Identifier Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
 		{ "Synthesis Identifier PossibleArrayAccessing", std::bind(&LLParser::SynthesisIdentifierPossibleArrayAccessing, this) },
-		{ "Synthesis Integer IntegerListExtension", std::bind(&LLParser::ExpandLastChildren, this) },
+		{ "Synthesis Integer IntegerListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Left square bracket IntegerList Right square bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis Comma ArrayLiteral", std::bind(&LLParser::RemoveComma, this) },
 		{ "Synthesis ArrayLiteral PossibleLiteralListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Left square bracket ArrayLiteral Right square bracket", std::bind(&LLParser::RemoveBracketsAndSynthesisType, this) },
 		{ "Synthesis Integer ExpressionListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "Synthesis Left square bracket ExpressionList Right square bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Comma IntegerList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
+		{ "Synthesis Comma ExpressionList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
 		{ "", std::bind(&LLParser::abc, this) },
 	};
 
