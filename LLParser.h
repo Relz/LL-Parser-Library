@@ -56,9 +56,11 @@ private:
 	bool CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const;
 	bool SynthesisType();
 	bool RemoveBrackets();
+	bool RemoveBracketsAndSynthesisType();
 	bool RemoveIfRoundBrackets();
 	bool RemoveSemicolon();
 	bool RemoveScopeBrackets();
+	bool ExpandLastChildren();
 	bool ExpandChildrenLastChildren();
 	bool RemoveBracketsAndSynthesis();
 	bool RemoveComma();
@@ -345,6 +347,13 @@ private:
 		{ "Synthesis Left square bracket Float Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
 		{ "Synthesis Left square bracket Identifier Right square bracket", std::bind(&LLParser::ExpandArrayLiteral, this) },
 		{ "Synthesis Identifier PossibleArrayAccessing", std::bind(&LLParser::SynthesisIdentifierPossibleArrayAccessing, this) },
+		{ "Synthesis Integer IntegerListExtension", std::bind(&LLParser::ExpandLastChildren, this) },
+		{ "Synthesis Left square bracket IntegerList Right square bracket", std::bind(&LLParser::RemoveBrackets, this) },
+		{ "Synthesis Comma ArrayLiteral", std::bind(&LLParser::RemoveComma, this) },
+		{ "Synthesis ArrayLiteral PossibleLiteralListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Left square bracket ArrayLiteral Right square bracket", std::bind(&LLParser::RemoveBracketsAndSynthesisType, this) },
+		{ "Synthesis Integer ExpressionListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
+		{ "Synthesis Left square bracket ExpressionList Right square bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "", std::bind(&LLParser::abc, this) },
 	};
 
@@ -375,6 +384,7 @@ private:
 		"Synthesis Identifier Assignment String literal",
 		"Synthesis Identifier Assignment Character literal",
 		"Synthesis Identifier Assignment Boolean literal",
+		"Synthesis Identifier Assignment ArrayLiteral",
 		"Synthesis Identifier Assignment ArithmeticPlus",
 		"Synthesis Identifier Assignment ArithmeticMinus",
 		"Synthesis Identifier Assignment ArithmeticMultiply",
@@ -389,7 +399,8 @@ private:
 		"Synthesis Read function Write function",
 		"Synthesis Assignment If",
 		"Synthesis Write function Assignment",
-		"Synthesis Type PossibleArray"
+		"Synthesis Type PossibleArray",
+		"Synthesis ExtendedIdentifier Assignment String literal"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {

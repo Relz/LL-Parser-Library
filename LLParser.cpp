@@ -344,7 +344,9 @@ void LLParser::ComputeDimensions(AstNode * extendedType, std::vector<unsigned in
 	{
 		return;
 	}
-	std::vector<AstNode*> const & dimensionsNodes = extendedType->children.back()->children;
+	std::vector<AstNode*> const & dimensionsNodes = extendedType->children.back()->children.front()->children.empty()
+		? extendedType->children.back()->children
+		: extendedType->children.back()->children.front()->children;
 	for (AstNode * dimensionNode : dimensionsNodes)
 	{
 		dimensions.emplace_back(stoi(dimensionNode->stringValue));
@@ -353,18 +355,30 @@ void LLParser::ComputeDimensions(AstNode * extendedType, std::vector<unsigned in
 
 bool LLParser::AddVariableToScope()
 {
-	std::vector<AstNode*> & extendedType = m_ast[m_ast.size() - 3]->children;
+	size_t i = 3;
+	while (m_ast[m_ast.size() - i]->name != "VariableDeclarationA")
+	{
+		++i;
+	}
+	std::vector<AstNode*> & extendedType = m_ast[m_ast.size() - i]->children;
 	std::string & variableType = extendedType[0]->stringValue;
 	std::string arraySizeString;
 	if (variableType.empty())
 	{
 		variableType = extendedType.front()->children.front()->stringValue;
-		arraySizeString = extendedType.front()->children.back()->children.front()->stringValue;
+		if (extendedType.front()->children.back()->children.front()->children.empty())
+		{
+			arraySizeString = extendedType.front()->children.back()->children.front()->stringValue;
+		}
+		else
+		{
+			arraySizeString = extendedType.front()->children.back()->children.front()->children.front()->stringValue;
+		}
 	}
 	std::string & variableName = extendedType[1]->stringValue;
 	std::vector<unsigned int> dimensions;
 	ComputeDimensions(extendedType.front(), dimensions);
-	llvm::Type * llvmType = LlvmHelper::CreateType(m_context, variableType, arraySizeString);
+	llvm::Type * llvmType = LlvmHelper::CreateType(m_context, variableType);
 	llvm::AllocaInst * llvmAllocaInst = nullptr;
 	if (variableType == TokenConstant::CoreType::Number::FLOAT && m_ast.back()->computedType == TokenConstant::CoreType::Number::INTEGER)
 	{
@@ -377,10 +391,12 @@ bool LLParser::AddVariableToScope()
 	}
 	else
 	{
-		int arraySize = stoi(arraySizeString);
-		llvm::Value * arraySizeValue = LlvmHelper::CreateInteger32Constant(m_context, arraySize);
-		llvmAllocaInst = m_builder->CreateAlloca(llvmType, arraySizeValue, "(" + variableName + ")" + "_pointer");
-		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, arraySize);
+		for (size_t j = dimensions.size() - 1; j != SIZE_MAX; --j)
+		{
+			llvmType = llvm::ArrayType::get(llvmType, dimensions[j]);
+		}
+		llvmAllocaInst = m_builder->CreateAlloca(llvmType, nullptr, "(" + variableName + ")" + "_pointer");
+		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, dimensions[dimensions.size() - 1]);
 	}
 	m_scopes.back()[variableName] = m_symbolTable.CreateRow(variableType, variableName, llvmAllocaInst, dimensions);
 
@@ -389,7 +405,17 @@ bool LLParser::AddVariableToScope()
 
 bool LLParser::UpdateVariableInScope()
 {
-	std::string & variableName = m_ast[m_ast.size() - 3]->stringValue;
+	bool arrayAccessing = false;
+	std::string variableName;
+	if (m_ast[m_ast.size() - 3]->stringValue.empty() && !m_ast[m_ast.size() - 3]->children.empty())
+	{
+		variableName = m_ast[m_ast.size() - 3]->children.front()->stringValue;
+		arrayAccessing = true;
+	}
+	else
+	{
+		variableName = m_ast[m_ast.size() - 3]->stringValue;
+	}
 
 	SymbolTableRow symbolTableRow;
 	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(variableName), symbolTableRow);
@@ -399,8 +425,18 @@ bool LLParser::UpdateVariableInScope()
 	}
 	else
 	{
-		int arraySize = symbolTableRow.arrayInformation->dimensions.front();
-		CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arraySize);
+		if (arrayAccessing)
+		{
+			llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type, std::to_string(symbolTableRow.arrayInformation->dimensions.front()));
+			llvm::Value * index64Bit = m_builder->CreateSExtOrTrunc(m_ast[m_ast.size() - 3]->children.back()->llvmValue, llvm::Type::getInt64Ty(m_context));
+			llvm::Value * inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, symbolTableRow.llvmAllocaInst, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "(" + variableName + ")_pointer");
+			m_builder->CreateStore(m_ast.back()->llvmValue, inBoundsGetElementPointer);
+		}
+		else
+		{
+			int arraySize = symbolTableRow.arrayInformation->dimensions.front();
+			CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arraySize);
+		}
 	}
 
 	return true;
@@ -838,13 +874,25 @@ bool LLParser::SynthesisModulus()
 
 bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 {
-	std::vector<AstNode*> & variableDeclarationChildren = m_ast[m_ast.size() - 3]->children;
+	size_t i = 3;
+	while (m_ast[m_ast.size() - i]->name != "VariableDeclarationA")
+	{
+		++i;
+	}
+	std::vector<AstNode*> & variableDeclarationChildren = m_ast[m_ast.size() - i]->children;
 	std::string variableType = variableDeclarationChildren.front()->stringValue;
 	std::string arraySizeString;
 	if (variableType.empty())
 	{
 		variableType = TokenConstant::CoreType::Complex::ARRAY;
-		arraySizeString = variableDeclarationChildren.front()->children.back()->children.front()->stringValue;
+		if (variableDeclarationChildren.front()->children.back()->children.front()->children.empty())
+		{
+			arraySizeString = variableDeclarationChildren.front()->children.back()->children.front()->stringValue;
+		}
+		else
+		{
+			arraySizeString = variableDeclarationChildren.front()->children.back()->children.front()->children.front()->stringValue;
+		}
 	}
 	std::string & variableName = variableDeclarationChildren[1]->stringValue;
 	std::string rightHandType = m_ast.back()->type;
@@ -902,15 +950,28 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 
 bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const
 {
-	std::string & variableName = m_ast[m_ast.size() - 3]->stringValue;
+	std::string variableName;
+	if (m_ast[m_ast.size() - 3]->stringValue.empty() && !m_ast[m_ast.size() - 3]->children.empty())
+	{
+		variableName = m_ast[m_ast.size() - 3]->children.front()->stringValue;
+	}
+	else
+	{
+		variableName = m_ast[m_ast.size() - 3]->stringValue;
+	}
 	SymbolTableRow symbolTableRow;
 	m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(variableName), symbolTableRow);
 	std::string & variableType = symbolTableRow.type;
-	unsigned int arraySize = 0;
 	if (symbolTableRow.arrayInformation != nullptr)
 	{
-		arraySize = symbolTableRow.arrayInformation->dimensions.front();
-		variableType = TokenConstant::CoreType::Complex::ARRAY;
+		if (m_ast[m_ast.size() - 3]->stringValue.empty() && !m_ast[m_ast.size() - 3]->children.empty())
+		{
+			variableType = symbolTableRow.type;
+		}
+		else
+		{
+			variableType = TokenConstant::CoreType::Complex::ARRAY;
+		}
 	}
 	std::string rightHandType = m_ast.back()->type;
 	std::string & rightHandValue = m_ast.back()->stringValue;
@@ -971,6 +1032,14 @@ bool LLParser::RemoveBrackets()
 	return true;
 }
 
+bool LLParser::RemoveBracketsAndSynthesisType()
+{
+	RemoveBrackets();
+	SynthesisType();
+
+	return true;
+}
+
 bool LLParser::RemoveBracketsAndSynthesis()
 {
 	m_ast.back() = m_ast.back()->children[1];
@@ -998,6 +1067,13 @@ bool LLParser::RemoveScopeBrackets()
 {
 	m_ast.back()->children.pop_back();
 	m_ast.erase(m_ast.end() - 2);
+
+	return true;
+}
+
+bool LLParser::ExpandLastChildren()
+{
+	m_ast.back()->children.back() = m_ast.back()->children.back()->children.front();
 
 	return true;
 }
@@ -1072,7 +1148,16 @@ void LLParser::ComputeArrayLiteralName(AstNode * arrayLiteralNode, std::string &
 	for (size_t i = 0; i < arrayLiteralNode->children.size(); ++i)
 	{
 		AstNode * arrayLiteralValue = arrayLiteralNode->children[i];
-		arrayLiteralString += arrayLiteralValue->stringValue;
+		std::string arrayLiteralStringPart;
+		if (arrayLiteralValue->stringValue.empty())
+		{
+			ComputeArrayLiteralName(arrayLiteralValue, arrayLiteralStringPart);
+		}
+		else
+		{
+			arrayLiteralStringPart = arrayLiteralValue->stringValue;
+		}
+		arrayLiteralString += arrayLiteralStringPart;
 		if (i < arrayLiteralNode->children.size() - 1)
 		{
 			arrayLiteralString += ", ";
@@ -1084,27 +1169,39 @@ void LLParser::ComputeArrayLiteralName(AstNode * arrayLiteralNode, std::string &
 
 bool LLParser::CreateLlvmArrayLiteral()
 {
-	std::string arrayLiteralElementTypeString;
-	if (m_ast[m_ast.size() - 3]->children.empty())
+	size_t i = 3;
+	while (m_ast[m_ast.size() - i]->name != "VariableDeclarationA")
+	{
+		++i;
+	}
+	std::string arrayLiteralElementType;
+	if (m_ast[m_ast.size() - i]->children.empty())
 	{
 		SymbolTableRow symbolTableRow;
-		m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(m_ast[m_ast.size() - 3]->stringValue), symbolTableRow);
-		arrayLiteralElementTypeString = symbolTableRow.type;
+		m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(m_ast[m_ast.size() - i]->stringValue), symbolTableRow);
+		arrayLiteralElementType = symbolTableRow.type;
 	}
 	else
 	{
-		arrayLiteralElementTypeString = m_ast[m_ast.size() - 3]->children.front()->children.front()->stringValue;
+		arrayLiteralElementType = m_ast[m_ast.size() - i]->children.front()->children.front()->stringValue;
 	}
 	std::vector<llvm::Constant*> arrayLiteralValues;
 	ComputeArrayLiteralValues(m_ast.back()->children, arrayLiteralValues);
-	llvm::ArrayType * arrayType = (llvm::ArrayType*)LlvmHelper::CreateType(m_context, arrayLiteralElementTypeString, std::to_string(arrayLiteralValues.size()));
+	llvm::ArrayType * arrayType = llvm::ArrayType::get(m_ast.back()->children.front()->llvmValue->getType(), arrayLiteralValues.size());
 
 	llvm::Constant * constant = llvm::ConstantArray::get(arrayType, arrayLiteralValues);
-	std::string arrayLiteralName;
-	ComputeArrayLiteralName(m_ast.back(), arrayLiteralName);
-	auto * globalVariable = new llvm::GlobalVariable(*m_mainBlock->getParent()->getParent(), constant->getType(), true, llvm::GlobalValue::PrivateLinkage, constant, arrayLiteralName);
-	globalVariable->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-	m_ast.back()->llvmValue = globalVariable;
+	if (m_ast[m_ast.size() - 3]->name == "VariableDeclarationA")
+	{
+		std::string arrayLiteralName;
+		ComputeArrayLiteralName(m_ast.back(), arrayLiteralName);
+		llvm::GlobalVariable * globalVariable = new llvm::GlobalVariable(*m_mainBlock->getParent()->getParent(), arrayType, true, llvm::GlobalValue::PrivateLinkage, constant, arrayLiteralName);
+		globalVariable->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+		m_ast.back()->llvmValue = globalVariable;
+	}
+	else
+	{
+		m_ast.back()->llvmValue = constant;
+	}
 
 	return true;
 }
@@ -1132,12 +1229,37 @@ bool LLParser::TryToLoadLlvmValueFromSymbolTable()
 	if (astNode->stringValue.empty())
 	{
 		m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(astNode->children.front()->stringValue), symbolTableRow);
-		std::string variableName = symbolTableRow.name + "[" + m_ast.back()->children.back()->stringValue + "]";
-		llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type, std::to_string(symbolTableRow.arrayInformation->dimensions.front()));
 		llvm::Type * arrayElementType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
-		llvm::Value * index64Bit = m_builder->CreateSExtOrTrunc(m_ast.back()->children.back()->llvmValue, llvm::Type::getInt64Ty(m_context));
-		llvm::Value * inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, symbolTableRow.llvmAllocaInst, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "(" + variableName + ")_pointer");
-		astNode->llvmValue = m_builder->CreateLoad(arrayElementType, inBoundsGetElementPointer, "(" + variableName + ")_value");
+		if (m_ast.back()->children.back()->children.empty())
+		{
+			std::string variableName = symbolTableRow.name + "[" + m_ast.back()->children.back()->stringValue + "]";
+			llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type, std::to_string(symbolTableRow.arrayInformation->dimensions.front()));
+			llvm::Value * index64Bit = m_builder->CreateSExtOrTrunc(m_ast.back()->children.back()->llvmValue, llvm::Type::getInt64Ty(m_context));
+			llvm::Value * inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, symbolTableRow.llvmAllocaInst, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "(" + variableName + ")_pointer");
+			astNode->llvmValue = m_builder->CreateLoad(arrayElementType, inBoundsGetElementPointer, "(" + variableName + ")_value");
+		}
+		else
+		{
+			llvm::Value * inBoundsGetElementPointer = symbolTableRow.llvmAllocaInst;
+			std::string variableName = symbolTableRow.name + "[";
+			for (size_t i = 0; i < m_ast.back()->children.back()->children.size(); ++i)
+			{
+				AstNode * child = m_ast.back()->children.back()->children[i];
+				variableName += child->stringValue;
+				llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
+				for (size_t j = m_ast.back()->children.back()->children.size() - 1; j != SIZE_MAX + i; --j)
+				{
+					arrayType = llvm::ArrayType::get(arrayType, symbolTableRow.arrayInformation->dimensions[j]);
+				}
+				llvm::Value * index64Bit = m_builder->CreateSExtOrTrunc(child->llvmValue, llvm::Type::getInt64Ty(m_context));
+				inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, inBoundsGetElementPointer, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "(" + variableName + "])_pointer");
+				if (i < m_ast.back()->children.back()->children.size() - 1)
+				{
+					variableName += ", ";
+				}
+			}
+			astNode->llvmValue = m_builder->CreateLoad(arrayElementType, inBoundsGetElementPointer, "(" + variableName + ")_value");
+		}
 	}
 	else
 	{
