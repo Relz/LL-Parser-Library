@@ -889,6 +889,294 @@ bool LLParser::SynthesisModulus()
 	return true;
 }
 
+bool LLParser::SynthesisEquivalence()
+{
+	bool identifiersExists = false;
+	AstNode * lhsNode = m_ast[m_ast.size() - 2];
+	std::string lhsType = lhsNode->type;
+	std::string & lhs = lhsNode->stringValue;
+	if (lhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			lhsType = lhsNode->computedType;
+		}
+	}
+	AstNode * rhsNode = m_ast.back()->children[1];
+	std::string rhsType = rhsNode->type;
+	std::string & rhs = rhsNode->stringValue;
+	if (rhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			rhsType = rhsNode->computedType;
+		}
+	}
+	std::string & resultType = lhsType;
+	if (!AreTypesCompatible(lhsType, rhsType, resultType))
+	{
+		PrintErrorMessage(
+			"Cannot compare for equivalence \"" + lhs + "\"" + "(" + "\"" + lhsType + "\"" + " type" + ")"
+			+ " with " + "\"" + rhs + "\"" + "(" + "\"" + rhsType + "\"" + " type" + ")" + "\n"
+		);
+
+		return false;
+	}
+	lhsNode->type = TokenConstant::Name::IDENTIFIER;
+	lhsNode->stringValue = "(" + lhs + " == " + rhs + ")";
+	lhsNode->isTemporaryIdentifier = true;
+	lhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, lhsNode->llvmValue);
+	rhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, rhsNode->llvmValue);
+	lhsNode->llvmValue = m_builder->CreateFCmp(llvm::FCmpInst::FCMP_OEQ, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+	lhsNode->computedType = resultType;
+	lhsNode->children.clear();
+	m_ast.back()->children.clear();
+
+	return true;
+}
+
+bool LLParser::SynthesisNotEquivalence()
+{
+	bool identifiersExists = false;
+	AstNode * lhsNode = m_ast[m_ast.size() - 2];
+	std::string lhsType = lhsNode->type;
+	std::string & lhs = lhsNode->stringValue;
+	if (lhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			lhsType = lhsNode->computedType;
+		}
+	}
+	AstNode * rhsNode = m_ast.back()->children[1];
+	std::string rhsType = rhsNode->type;
+	std::string & rhs = rhsNode->stringValue;
+	if (rhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			rhsType = rhsNode->computedType;
+		}
+	}
+	std::string & resultType = lhsType;
+	if (!AreTypesCompatible(lhsType, rhsType, resultType))
+	{
+		PrintErrorMessage(
+			"Cannot compare for equivalence \"" + lhs + "\"" + "(" + "\"" + lhsType + "\"" + " type" + ")"
+			+ " with " + "\"" + rhs + "\"" + "(" + "\"" + rhsType + "\"" + " type" + ")" + "\n"
+		);
+
+		return false;
+	}
+	lhsNode->type = TokenConstant::Name::IDENTIFIER;
+	lhsNode->stringValue = "(" + lhs + " == " + rhs + ")";
+	lhsNode->isTemporaryIdentifier = true;
+	lhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, lhsNode->llvmValue);
+	rhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, rhsNode->llvmValue);
+	lhsNode->llvmValue = m_builder->CreateFCmp(llvm::FCmpInst::FCMP_ONE, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+	lhsNode->computedType = resultType;
+	lhsNode->children.clear();
+	m_ast.back()->children.clear();
+
+	return true;
+}
+
+bool LLParser::SynthesisMoreOrEquivalence()
+{
+	bool identifiersExists = false;
+	AstNode * lhsNode = m_ast[m_ast.size() - 2];
+	std::string lhsType = lhsNode->type;
+	std::string & lhs = lhsNode->stringValue;
+	if (lhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			lhsType = lhsNode->computedType;
+		}
+	}
+	AstNode * rhsNode = m_ast.back()->children[1];
+	std::string rhsType = rhsNode->type;
+	std::string & rhs = rhsNode->stringValue;
+	if (rhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			rhsType = rhsNode->computedType;
+		}
+	}
+	std::string & resultType = lhsType;
+	if (!AreTypesCompatible(lhsType, rhsType, resultType))
+	{
+		PrintErrorMessage(
+			"Cannot compare for equivalence \"" + lhs + "\"" + "(" + "\"" + lhsType + "\"" + " type" + ")"
+			+ " with " + "\"" + rhs + "\"" + "(" + "\"" + rhsType + "\"" + " type" + ")" + "\n"
+		);
+
+		return false;
+	}
+	lhsNode->type = TokenConstant::Name::IDENTIFIER;
+	lhsNode->stringValue = "(" + lhs + " == " + rhs + ")";
+	lhsNode->isTemporaryIdentifier = true;
+	lhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, lhsNode->llvmValue);
+	rhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, rhsNode->llvmValue);
+	lhsNode->llvmValue = m_builder->CreateFCmp(llvm::FCmpInst::FCMP_OGE, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+	lhsNode->computedType = resultType;
+	lhsNode->children.clear();
+	m_ast.back()->children.clear();
+
+	return true;
+}
+
+bool LLParser::SynthesisLessOrEquivalence()
+{
+	bool identifiersExists = false;
+	AstNode * lhsNode = m_ast[m_ast.size() - 2];
+	std::string lhsType = lhsNode->type;
+	std::string & lhs = lhsNode->stringValue;
+	if (lhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			lhsType = lhsNode->computedType;
+		}
+	}
+	AstNode * rhsNode = m_ast.back()->children[1];
+	std::string rhsType = rhsNode->type;
+	std::string & rhs = rhsNode->stringValue;
+	if (rhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			rhsType = rhsNode->computedType;
+		}
+	}
+	std::string & resultType = lhsType;
+	if (!AreTypesCompatible(lhsType, rhsType, resultType))
+	{
+		PrintErrorMessage(
+			"Cannot compare for equivalence \"" + lhs + "\"" + "(" + "\"" + lhsType + "\"" + " type" + ")"
+			+ " with " + "\"" + rhs + "\"" + "(" + "\"" + rhsType + "\"" + " type" + ")" + "\n"
+		);
+
+		return false;
+	}
+	lhsNode->type = TokenConstant::Name::IDENTIFIER;
+	lhsNode->stringValue = "(" + lhs + " == " + rhs + ")";
+	lhsNode->isTemporaryIdentifier = true;
+	lhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, lhsNode->llvmValue);
+	rhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, rhsNode->llvmValue);
+	lhsNode->llvmValue = m_builder->CreateFCmp(llvm::FCmpInst::FCMP_OLE, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+	lhsNode->computedType = resultType;
+	lhsNode->children.clear();
+	m_ast.back()->children.clear();
+
+	return true;
+}
+
+bool LLParser::SynthesisMore()
+{
+	bool identifiersExists = false;
+	AstNode * lhsNode = m_ast[m_ast.size() - 2];
+	std::string lhsType = lhsNode->type;
+	std::string & lhs = lhsNode->stringValue;
+	if (lhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			lhsType = lhsNode->computedType;
+		}
+	}
+	AstNode * rhsNode = m_ast.back()->children[1];
+	std::string rhsType = rhsNode->type;
+	std::string & rhs = rhsNode->stringValue;
+	if (rhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			rhsType = rhsNode->computedType;
+		}
+	}
+	std::string & resultType = lhsType;
+	if (!AreTypesCompatible(lhsType, rhsType, resultType))
+	{
+		PrintErrorMessage(
+			"Cannot compare for equivalence \"" + lhs + "\"" + "(" + "\"" + lhsType + "\"" + " type" + ")"
+			+ " with " + "\"" + rhs + "\"" + "(" + "\"" + rhsType + "\"" + " type" + ")" + "\n"
+		);
+
+		return false;
+	}
+	lhsNode->type = TokenConstant::Name::IDENTIFIER;
+	lhsNode->stringValue = "(" + lhs + " == " + rhs + ")";
+	lhsNode->isTemporaryIdentifier = true;
+	lhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, lhsNode->llvmValue);
+	rhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, rhsNode->llvmValue);
+	lhsNode->llvmValue = m_builder->CreateFCmp(llvm::FCmpInst::FCMP_OGT, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+	lhsNode->computedType = resultType;
+	lhsNode->children.clear();
+	m_ast.back()->children.clear();
+
+	return true;
+}
+
+bool LLParser::SynthesisLess()
+{
+	bool identifiersExists = false;
+	AstNode * lhsNode = m_ast[m_ast.size() - 2];
+	std::string lhsType = lhsNode->type;
+	std::string & lhs = lhsNode->stringValue;
+	if (lhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (lhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			lhsType = lhsNode->computedType;
+		}
+	}
+	AstNode * rhsNode = m_ast.back()->children[1];
+	std::string rhsType = rhsNode->type;
+	std::string & rhs = rhsNode->stringValue;
+	if (rhsType == TokenConstant::Name::IDENTIFIER)
+	{
+		identifiersExists = true;
+		if (rhsNode->computedType != TokenConstant::Name::IDENTIFIER)
+		{
+			rhsType = rhsNode->computedType;
+		}
+	}
+	std::string & resultType = lhsType;
+	if (!AreTypesCompatible(lhsType, rhsType, resultType))
+	{
+		PrintErrorMessage(
+			"Cannot compare for equivalence \"" + lhs + "\"" + "(" + "\"" + lhsType + "\"" + " type" + ")"
+			+ " with " + "\"" + rhs + "\"" + "(" + "\"" + rhsType + "\"" + " type" + ")" + "\n"
+		);
+
+		return false;
+	}
+	lhsNode->type = TokenConstant::Name::IDENTIFIER;
+	lhsNode->stringValue = "(" + lhs + " == " + rhs + ")";
+	lhsNode->isTemporaryIdentifier = true;
+	lhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, lhsNode->llvmValue);
+	rhsNode->llvmValue = LlvmHelper::ConvertToFloat(m_builder, rhsNode->llvmValue);
+	lhsNode->llvmValue = m_builder->CreateFCmp(llvm::FCmpInst::FCMP_OLT, lhsNode->llvmValue, rhsNode->llvmValue, lhsNode->stringValue);
+	lhsNode->computedType = resultType;
+	lhsNode->children.clear();
+	m_ast.back()->children.clear();
+
+	return true;
+}
+
 bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 {
 	size_t i = 3;
