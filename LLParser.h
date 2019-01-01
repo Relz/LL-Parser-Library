@@ -402,7 +402,9 @@ private:
 		"Synthesis Assignment If",
 		"Synthesis Write function Assignment",
 		"Synthesis Type PossibleArray",
-		"Synthesis ExtendedIdentifier Assignment String literal"
+		"Synthesis ExtendedIdentifier Assignment String literal",
+		"Synthesis ExtendedIdentifier Assignment Integer",
+		"Synthesis Write function Write function"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
