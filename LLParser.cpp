@@ -398,7 +398,7 @@ bool LLParser::AddVariableToScope()
 			llvmType = llvm::ArrayType::get(llvmType, dimensions[j]);
 		}
 		llvmAllocaInst = m_builder->CreateAlloca(llvmType, nullptr, "(" + variableName + ")" + "_pointer");
-		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, arrayElementType, std::accumulate(dimensions.begin(), dimensions.end(), 0));
+		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, arrayElementType, std::accumulate(dimensions.begin(), dimensions.end(), 1, std::multiplies<int>()));
 	}
 	m_scopes.back()[variableName] = m_symbolTable.CreateRow(variableType, variableName, llvmAllocaInst, dimensions);
 
@@ -462,7 +462,7 @@ bool LLParser::UpdateVariableInScope()
 		else
 		{
 			llvm::Type * arrayElementType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
-			CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arrayElementType, std::accumulate(symbolTableRow.arrayInformation->dimensions.begin(), symbolTableRow.arrayInformation->dimensions.end(), 0));
+			CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arrayElementType, std::accumulate(symbolTableRow.arrayInformation->dimensions.begin(), symbolTableRow.arrayInformation->dimensions.end(), 1, std::multiplies<int>()));
 		}
 	}
 
