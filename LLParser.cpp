@@ -430,21 +430,31 @@ bool LLParser::UpdateVariableInScope()
 		if (arrayAccessing)
 		{
 			llvm::Value * inBoundsGetElementPointer = symbolTableRow.llvmAllocaInst;
-			std::string variableName = symbolTableRow.name + "[";
-			for (size_t i = 0; i < m_ast[m_ast.size() - 3]->children.back()->children.size(); ++i)
+			if (m_ast[m_ast.size() - 3]->children.back()->children.empty())
 			{
-				AstNode * child = m_ast[m_ast.size() - 3]->children.back()->children[i];
-				variableName += child->stringValue;
-				llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
-				for (size_t j = m_ast[m_ast.size() - 3]->children.back()->children.size() - 1; j != SIZE_MAX + i; --j)
-				{
-					arrayType = llvm::ArrayType::get(arrayType, symbolTableRow.arrayInformation->dimensions[j]);
-				}
+				AstNode * child = m_ast[m_ast.size() - 3]->children.back();
+				llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type, std::to_string(symbolTableRow.arrayInformation->dimensions.front()));
 				llvm::Value * index64Bit = m_builder->CreateSExtOrTrunc(child->llvmValue, llvm::Type::getInt64Ty(m_context));
-				inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, inBoundsGetElementPointer, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "(" + variableName + "])_pointer");
-				if (i < m_ast[m_ast.size() - 3]->children.back()->children.size() - 1)
+				inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, inBoundsGetElementPointer, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "([" + child->stringValue + "])_pointer");
+			}
+			else
+			{
+				std::string variableName = symbolTableRow.name + "[";
+				for (size_t i = 0; i < m_ast[m_ast.size() - 3]->children.back()->children.size(); ++i)
 				{
-					variableName += ", ";
+					AstNode * child = m_ast[m_ast.size() - 3]->children.back()->children[i];
+					variableName += child->stringValue;
+					llvm::Type * arrayType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
+					for (size_t j = m_ast[m_ast.size() - 3]->children.back()->children.size() - 1; j != SIZE_MAX + i; --j)
+					{
+						arrayType = llvm::ArrayType::get(arrayType, symbolTableRow.arrayInformation->dimensions[j]);
+					}
+					llvm::Value * index64Bit = m_builder->CreateSExtOrTrunc(child->llvmValue, llvm::Type::getInt64Ty(m_context));
+					inBoundsGetElementPointer = m_builder->CreateInBoundsGEP(arrayType, inBoundsGetElementPointer, { LlvmHelper::CreateInteger64Constant(m_context, 0), index64Bit }, "(" + variableName + "])_pointer");
+					if (i < m_ast[m_ast.size() - 3]->children.back()->children.size() - 1)
+					{
+						variableName += ", ";
+					}
 				}
 			}
 			m_builder->CreateStore(m_ast.back()->llvmValue, inBoundsGetElementPointer);
@@ -1200,11 +1210,18 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 		}
 	}
 	std::string & variableName = variableDeclarationChildren[1]->stringValue;
-	std::string rightHandType = m_ast.back()->type;
-	std::string & rightHandValue = m_ast.back()->stringValue;
+	AstNode * rhsNode = m_ast.back();
+	std::string rightHandType = rhsNode->type;
+	std::string rightHandValue = rhsNode->stringValue;
+	if (rightHandType.empty())
+	{
+		rhsNode = m_ast.back()->children.front();
+		rightHandType = rhsNode->type;
+		rightHandValue = rhsNode->stringValue;
+	}
 	if (rightHandType == TokenConstant::Name::IDENTIFIER)
 	{
-		if (m_ast.back()->computedType == TokenConstant::Name::IDENTIFIER)
+		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
 			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rightHandValue), symbolTableRow);
@@ -1212,16 +1229,15 @@ bool LLParser::CheckVariableTypeWithAssignmentRightHandTypeForEquality() const
 		}
 		else
 		{
-			rightHandType = m_ast.back()->computedType;
+			rightHandType = rhsNode->computedType;
 		}
 	}
 	else if (rightHandType == TokenConstant::Name::ARRAY_LITERAL)
 	{
-		AstNode * arrayLiteral = m_ast.back();
-		if (arrayLiteral->children.size() != stoi(arraySizeString))
+		if (rhsNode->children.size() != stoi(arraySizeString))
 		{
 			PrintErrorMessage(
-				"Cannot set array literal with size " + std::to_string(arrayLiteral->children.size())
+				"Cannot set array literal with size " + std::to_string(rhsNode->children.size())
 				+ " to array variable " + "\"" + variableName + "\"" + " with size " + std::string(arraySizeString) + "\n");
 
 			return false;
@@ -1278,11 +1294,18 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const
 			variableType = TokenConstant::CoreType::Complex::ARRAY;
 		}
 	}
-	std::string rightHandType = m_ast.back()->type;
-	std::string & rightHandValue = m_ast.back()->stringValue;
+	AstNode * rhsNode = m_ast.back();
+	std::string rightHandType = rhsNode->type;
+	std::string & rightHandValue = rhsNode->stringValue;
+	if (rightHandType.empty())
+	{
+		rhsNode = m_ast.back()->children.front();
+		rightHandType = rhsNode->type;
+		rightHandValue = rhsNode->stringValue;
+	}
 	if (rightHandType == TokenConstant::Name::IDENTIFIER)
 	{
-		if (m_ast.back()->computedType == TokenConstant::Name::IDENTIFIER)
+		if (rhsNode->computedType == TokenConstant::Name::IDENTIFIER)
 		{
 			SymbolTableRow symbolTableRow;
 			m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(rightHandValue), symbolTableRow);
@@ -1290,7 +1313,7 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const
 		}
 		else
 		{
-			rightHandType = m_ast.back()->computedType;
+			rightHandType = rhsNode->computedType;
 		}
 	}
 

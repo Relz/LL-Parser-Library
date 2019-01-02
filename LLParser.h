@@ -361,6 +361,7 @@ private:
 		{ "Synthesis More Integer B", std::bind(&LLParser::SynthesisMore, this) },
 		{ "Synthesis More Float", std::bind(&LLParser::SynthesisMore, this) },
 		{ "Synthesis More Float B", std::bind(&LLParser::SynthesisMore, this) },
+		{ "Synthesis More ExtendedIdentifier", std::bind(&LLParser::SynthesisMore, this) },
 		{ "Synthesis More Identifier", std::bind(&LLParser::SynthesisMore, this) },
 		{ "Synthesis More Identifier B", std::bind(&LLParser::SynthesisMore, this) },
 		{ "Synthesis More String", std::bind(&LLParser::SynthesisMore, this) },
@@ -492,6 +493,7 @@ private:
 		"Synthesis VariableDeclarationA Assignment Integer",
 		"Synthesis VariableDeclarationA Assignment Float",
 		"Synthesis VariableDeclarationA Assignment Identifier",
+		"Synthesis VariableDeclarationA Assignment ExtendedIdentifier",
 		"Synthesis VariableDeclarationA Assignment String",
 		"Synthesis VariableDeclarationA Assignment Character",
 		"Synthesis VariableDeclarationA Assignment String literal",
@@ -530,7 +532,15 @@ private:
 		"Synthesis Type PossibleArray",
 		"Synthesis ExtendedIdentifier Assignment String literal",
 		"Synthesis ExtendedIdentifier Assignment Integer",
-		"Synthesis Write function Write function"
+		"Synthesis Write function Write function",
+		"Synthesis ExtendedIdentifier Assignment ExtendedIdentifier",
+		"Synthesis ExtendedIdentifier Assignment Identifier",
+		"Synthesis Assignment Assignment",
+		"Synthesis IfCondition StatementListBlock",
+		"Synthesis If Assignment",
+		"Synthesis While Assignment",
+		"Synthesis While Write function",
+		"Synthesis While StatementList"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {
