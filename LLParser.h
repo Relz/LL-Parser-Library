@@ -44,7 +44,7 @@ private:
 	bool AddVariableToScope();
 	bool UpdateVariableInScope();
 	bool CheckIdentifierForAlreadyExisting() const;
-	bool CheckIdentifierForExisting() const;
+	bool CheckIdentifierForExisting();
 	bool Synthesis();
 	bool SynthesisPlus();
 	bool SynthesisMinus();
@@ -66,7 +66,6 @@ private:
 	bool RemoveIfRoundBrackets();
 	bool RemoveSemicolon();
 	bool RemoveScopeBrackets();
-	bool ExpandLastChildren();
 	bool ExpandChildrenLastChildren();
 	bool RemoveBracketsAndSynthesis();
 	bool RemoveComma();
@@ -176,6 +175,7 @@ private:
 		{ "Synthesis Plus ArithmeticDivision", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisPlus, this) },
 		{ "Synthesis Plus ArithmeticModule", std::bind(&LLParser::SynthesisPlus, this) },
+		{ "Synthesis Plus ExtendedIdentifier", std::bind(&LLParser::SynthesisPlus, this) },
 
 		{ "Synthesis Minus Integer", std::bind(&LLParser::SynthesisMinus, this) },
 		{ "Synthesis Minus Integer B", std::bind(&LLParser::SynthesisMinus, this) },
@@ -196,6 +196,7 @@ private:
 		{ "Synthesis Minus ArithmeticDivision", std::bind(&LLParser::SynthesisMinus, this) },
 		{ "Synthesis Minus ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisMinus, this) },
 		{ "Synthesis Minus ArithmeticModule", std::bind(&LLParser::SynthesisMinus, this) },
+		{ "Synthesis Minus ExtendedIdentifier", std::bind(&LLParser::SynthesisMinus, this) },
 
 		{ "Synthesis Multiply Integer", std::bind(&LLParser::SynthesisMultiply, this) },
 		{ "Synthesis Multiply Integer B", std::bind(&LLParser::SynthesisMultiply, this) },
@@ -216,6 +217,7 @@ private:
 		{ "Synthesis Multiply ArithmeticDivision", std::bind(&LLParser::SynthesisMultiply, this) },
 		{ "Synthesis Multiply ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisMultiply, this) },
 		{ "Synthesis Multiply ArithmeticModule", std::bind(&LLParser::SynthesisMultiply, this) },
+		{ "Synthesis Multiply ExtendedIdentifier", std::bind(&LLParser::SynthesisMultiply, this) },
 
 		{ "Synthesis Integer division Integer", std::bind(&LLParser::SynthesisIntegerDivision, this) },
 		{ "Synthesis Integer division Integer B", std::bind(&LLParser::SynthesisIntegerDivision, this) },
@@ -236,6 +238,7 @@ private:
 		{ "Synthesis Integer division ArithmeticDivision", std::bind(&LLParser::SynthesisIntegerDivision, this) },
 		{ "Synthesis Integer division ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisIntegerDivision, this) },
 		{ "Synthesis Integer division ArithmeticModule", std::bind(&LLParser::SynthesisIntegerDivision, this) },
+		{ "Synthesis Integer division ExtendedIdentifier", std::bind(&LLParser::SynthesisIntegerDivision, this) },
 
 		{ "Synthesis Division Integer", std::bind(&LLParser::SynthesisDivision, this) },
 		{ "Synthesis Division Integer B", std::bind(&LLParser::SynthesisDivision, this) },
@@ -256,6 +259,7 @@ private:
 		{ "Synthesis Division ArithmeticDivision", std::bind(&LLParser::SynthesisDivision, this) },
 		{ "Synthesis Division ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisDivision, this) },
 		{ "Synthesis Division ArithmeticModule", std::bind(&LLParser::SynthesisDivision, this) },
+		{ "Synthesis Division ExtendedIdentifier", std::bind(&LLParser::SynthesisDivision, this) },
 
 		{ "Synthesis Modulus Integer", std::bind(&LLParser::SynthesisModulus, this) },
 		{ "Synthesis Modulus Integer B", std::bind(&LLParser::SynthesisModulus, this) },
@@ -276,6 +280,7 @@ private:
 		{ "Synthesis Modulus ArithmeticDivision", std::bind(&LLParser::SynthesisModulus, this) },
 		{ "Synthesis Modulus ArithmeticIntegerDivision", std::bind(&LLParser::SynthesisModulus, this) },
 		{ "Synthesis Modulus ArithmeticModule", std::bind(&LLParser::SynthesisModulus, this) },
+		{ "Synthesis Modulus ExtendedIdentifier", std::bind(&LLParser::SynthesisModulus, this) },
 
 		{ "Synthesis Equivalence Integer", std::bind(&LLParser::SynthesisEquivalence, this) },
 		{ "Synthesis Equivalence Integer B", std::bind(&LLParser::SynthesisEquivalence, this) },
@@ -289,6 +294,8 @@ private:
 		{ "Synthesis Equivalence String literal B", std::bind(&LLParser::SynthesisEquivalence, this) },
 		{ "Synthesis Equivalence Character literal", std::bind(&LLParser::SynthesisEquivalence, this) },
 		{ "Synthesis Equivalence Character literal B", std::bind(&LLParser::SynthesisEquivalence, this) },
+		{ "Synthesis Equivalence Boolean literal", std::bind(&LLParser::SynthesisEquivalence, this) },
+		{ "Synthesis Equivalence Boolean literal B", std::bind(&LLParser::SynthesisEquivalence, this) },
 		{ "Synthesis Equivalence Character", std::bind(&LLParser::SynthesisEquivalence, this) },
 		{ "Synthesis Equivalence Character B", std::bind(&LLParser::SynthesisEquivalence, this) },
 		{ "Synthesis Equivalence ArithmeticMinus", std::bind(&LLParser::SynthesisEquivalence, this) },
@@ -309,6 +316,8 @@ private:
 		{ "Synthesis Not equivalence String literal B", std::bind(&LLParser::SynthesisNotEquivalence, this) },
 		{ "Synthesis Not equivalence Character literal", std::bind(&LLParser::SynthesisNotEquivalence, this) },
 		{ "Synthesis Not equivalence Character literal B", std::bind(&LLParser::SynthesisNotEquivalence, this) },
+		{ "Synthesis Not equivalence Boolean literal", std::bind(&LLParser::SynthesisNotEquivalence, this) },
+		{ "Synthesis Not equivalence Boolean literal B", std::bind(&LLParser::SynthesisNotEquivalence, this) },
 		{ "Synthesis Not equivalence Character", std::bind(&LLParser::SynthesisNotEquivalence, this) },
 		{ "Synthesis Not equivalence Character B", std::bind(&LLParser::SynthesisNotEquivalence, this) },
 		{ "Synthesis Not equivalence ArithmeticMinus", std::bind(&LLParser::SynthesisNotEquivalence, this) },
@@ -483,6 +492,7 @@ private:
 		{ "Synthesis Left square bracket ExpressionList Right square bracket", std::bind(&LLParser::RemoveBrackets, this) },
 		{ "Synthesis Comma IntegerList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
 		{ "Synthesis Comma ExpressionList", std::bind(&LLParser::SynthesisLastChildrenChildren, this) },
+		{ "Synthesis Identifier ExpressionListExtension", std::bind(&LLParser::ExpandChildrenLastChildren, this) },
 		{ "", std::bind(&LLParser::abc, this) },
 	};
 
@@ -540,7 +550,12 @@ private:
 		"Synthesis If Assignment",
 		"Synthesis While Assignment",
 		"Synthesis While Write function",
-		"Synthesis While StatementList"
+		"Synthesis While StatementList",
+		"Synthesis Assignment Write function",
+		"Synthesis Left curly bracket Assignment Right curly bracket",
+		"Synthesis Left curly bracket If Right curly bracket",
+		"Synthesis If StatementList",
+		"Synthesis Read function Assignment"
 	};
 
 	std::unordered_map<std::string, std::unordered_set<std::string>> EXTRA_COMPATIBLE_TYPES = {

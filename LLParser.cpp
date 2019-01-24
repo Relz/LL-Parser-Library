@@ -16,10 +16,16 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/DataLayout.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/ExecutionEngine/Interpreter.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/TargetRegistry.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/Host.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/Target/TargetOptions.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 LLParser::LLParser(std::string const & ruleFileName)
@@ -30,7 +36,7 @@ LLParser::LLParser(std::string const & ruleFileName)
 	std::vector<llvm::Type *> mainFunctionArgumentsTypes;
 	m_mainFunctionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(m_context), mainFunctionArgumentsTypes, false);
 	m_mainFunction = llvm::Function::Create(m_mainFunctionType, llvm::GlobalValue::ExternalLinkage, "main", m_module.get());
-	m_mainBlock = llvm::BasicBlock::Create(m_context, "main block", m_mainFunction, 0);
+	m_mainBlock = llvm::BasicBlock::Create(m_context, "main block", m_mainFunction, nullptr);
 	m_builder = new llvm::IRBuilder(m_context);
 	m_builder->SetInsertPoint(m_mainBlock);
 	m_previousBlocks.push(m_mainBlock);
@@ -175,13 +181,14 @@ bool LLParser::IsValid(
 	}
 	if (result)
 	{
+		m_builder->CreateRet(LlvmHelper::CreateInteger32Constant(m_context, 0));
+
 		std::cout << "\033[1;30;42m" << "--------------- Recode ---------------" << "\033[0m" << std::endl;
 		PrintTokenInformations(tokenInformations, 0, tokenInformations.size(), "32");
 		std::cout << "\n";
 		std::cout << "\033[1;30;42m" << "--------------------------------------" << "\033[0m" << std::endl;
 		std::cout << "         ⬇         ⬇         ⬇        " << std::endl;
 
-		m_builder->CreateRet(LlvmHelper::CreateInteger32Constant(m_context, 0));
 		std::cout << "\033[1;30;44m" << "------------ LLVM-IR Code ------------" << "\033[0m" << std::endl;
 		llvm::outs() << "\033[34m";
 		m_module->print(llvm::outs(), nullptr);
@@ -189,12 +196,58 @@ bool LLParser::IsValid(
 		std::cout << "         ⬇         ⬇         ⬇        " << std::endl;
 
 		std::string errStr;
-		llvm::ExecutionEngine * engine = llvm::EngineBuilder(std::move(m_module)).setErrorStr(&errStr).create();
+		llvm::ExecutionEngine * engine = llvm::EngineBuilder(std::make_unique<llvm::Module>("Main", m_context)).setErrorStr(&errStr).create();
 		engine->finalizeObject();
 		std::cout << "\033[1;30;47m" << "-------- Executed LLVM-IR Code -------" << "\033[0m" << std::endl;
 		std::cout << "\033[37m";
 		engine->runFunction(m_mainFunction, std::vector<llvm::GenericValue>());
 		std::cout << "\033[1;30;47m" << "--------------------------------------" << "\033[0m" << std::endl;
+
+		llvm::InitializeAllTargetInfos();
+		llvm::InitializeAllTargets();
+		llvm::InitializeAllTargetMCs();
+		llvm::InitializeAllAsmParsers();
+		llvm::InitializeAllAsmPrinters();
+
+		std::string targetTriple = llvm::sys::getDefaultTargetTriple();
+		m_module->setTargetTriple(targetTriple);
+
+		std::string error;
+		auto target = llvm::TargetRegistry::lookupTarget(targetTriple, error);
+
+		if (!target)
+		{
+			std::cout << "Target: " + error;
+		}
+		else
+		{
+			llvm::TargetOptions opt;
+			llvm::Optional<llvm::Reloc::Model> relocationModel = llvm::Optional<llvm::Reloc::Model>(llvm::Reloc::Model::PIC_);
+			llvm::TargetMachine * targetMachine = target->createTargetMachine(targetTriple, "generic", "", opt, relocationModel);
+
+			m_module->setDataLayout(targetMachine->createDataLayout());
+
+			std::error_code errorCode;
+			llvm::raw_fd_ostream output("output.o", errorCode, llvm::sys::fs::F_None);
+
+			if (errorCode)
+			{
+				std::cout << "Could not open file: " << errorCode.message();
+			}
+			else
+			{
+				llvm::legacy::PassManager passManager;
+				if (targetMachine->addPassesToEmitFile(passManager, output, nullptr, llvm::TargetMachine::CGFT_ObjectFile))
+				{
+					std::cout << "TargetMachine can't emit a file of this type";
+				}
+				else
+				{
+					passManager.run(*m_module);
+					output.flush();
+				}
+			}
+		}
 	}
 	return result;
 }
@@ -398,7 +451,7 @@ bool LLParser::AddVariableToScope()
 			llvmType = llvm::ArrayType::get(llvmType, dimensions[j]);
 		}
 		llvmAllocaInst = m_builder->CreateAlloca(llvmType, nullptr, "(" + variableName + ")" + "_pointer");
-		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, arrayElementType, std::accumulate(dimensions.begin(), dimensions.end(), 1, std::multiplies<int>()));
+		CreateLlvmArrayAssignFunction(llvmAllocaInst, variableName, arrayElementType, std::accumulate(dimensions.begin(), dimensions.end(), 1, std::multiplies<>()));
 	}
 	m_scopes.back()[variableName] = m_symbolTable.CreateRow(variableType, variableName, llvmAllocaInst, dimensions);
 
@@ -462,7 +515,7 @@ bool LLParser::UpdateVariableInScope()
 		else
 		{
 			llvm::Type * arrayElementType = LlvmHelper::CreateType(m_context, symbolTableRow.type);
-			CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arrayElementType, std::accumulate(symbolTableRow.arrayInformation->dimensions.begin(), symbolTableRow.arrayInformation->dimensions.end(), 1, std::multiplies<int>()));
+			CreateLlvmArrayAssignFunction(symbolTableRow.llvmAllocaInst, variableName, arrayElementType, std::accumulate(symbolTableRow.arrayInformation->dimensions.begin(), symbolTableRow.arrayInformation->dimensions.end(), 1, std::multiplies<>()));
 		}
 	}
 
@@ -484,11 +537,16 @@ bool LLParser::CheckIdentifierForAlreadyExisting() const
 	return true;
 }
 
-bool LLParser::CheckIdentifierForExisting() const
+bool LLParser::CheckIdentifierForExisting()
 {
-	std::string const & identifierNameToCheck = m_ast.back()->stringValue.empty() && !m_ast.back()->children.empty()
+	bool isExtendedIdentifier = m_ast.back()->stringValue.empty() && !m_ast.back()->children.empty();
+	std::string const & identifierNameToCheck = isExtendedIdentifier
 			? m_ast.back()->children.front()->stringValue
 			: m_ast.back()->stringValue;
+	if (isExtendedIdentifier)
+	{
+		SynthesisType();
+	}
 	for (std::unordered_map<std::string, unsigned int> const & scope : m_scopes)
 	{
 		if (scope.find(identifierNameToCheck) != scope.end())
@@ -1345,8 +1403,19 @@ bool LLParser::CheckIdentifierTypeWithAssignmentRightHandTypeForEquality() const
 
 bool LLParser::SynthesisType()
 {
+	if (m_ast.back()->children.empty()) {
+		return true;
+	}
 	m_ast.back()->type = m_ast.back()->children.front()->type;
 	m_ast.back()->computedType = m_ast.back()->children.front()->computedType;
+	if (m_ast.back()->computedType == TokenConstant::Name::IDENTIFIER)
+	{
+		SymbolTableRow symbolTableRow;
+		if (m_symbolTable.GetSymbolTableRowByRowIndex(FindRowIndexInScopeByName(m_ast.back()->children.front()->stringValue), symbolTableRow))
+		{
+			m_ast.back()->computedType = symbolTableRow.type;
+		}
+	}
 
 	return true;
 }
@@ -1395,13 +1464,6 @@ bool LLParser::RemoveScopeBrackets()
 {
 	m_ast.back()->children.pop_back();
 	m_ast.erase(m_ast.end() - 2);
-
-	return true;
-}
-
-bool LLParser::ExpandLastChildren()
-{
-	m_ast.back()->children.back() = m_ast.back()->children.back()->children.front();
 
 	return true;
 }
